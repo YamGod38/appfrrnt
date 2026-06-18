@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { Stethoscope, Activity, CalendarClock, ChevronDown, CheckCircle2, XCircle, Search, UserPlus, Trash2, ShieldAlert } from 'lucide-react';
 
-const socket = io('http://localhost:5000');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
 
 export default function ManageDoctors() {
     const [doctors, setDoctors] = useState([]);

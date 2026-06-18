@@ -35,7 +35,7 @@ export default function AiSuggest({ activeCall }) {
     const generateSuggestion = async (newTranscript) => {
         setIsGenerating(true);
         try {
-            const res = await fetch('http://localhost:5000/api/ai/copilot-suggest', {
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/ai/copilot-suggest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ transcript: newTranscript })

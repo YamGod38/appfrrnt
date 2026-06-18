@@ -14,7 +14,7 @@ export default function InteractionTimeline({ activeCall }) {
             setLoading(true);
             try {
                 const token = localStorage.getItem('token');
-                const res = await fetch(`http://localhost:5000/api/patients/${encodeURIComponent(activeCall.callerNumber)}/history`, {
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}` + `/api/patients/${encodeURIComponent(activeCall.callerNumber)}/history`, {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }

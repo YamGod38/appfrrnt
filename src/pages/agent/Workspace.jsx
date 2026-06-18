@@ -9,7 +9,7 @@ import UnifiedInbox from '../../components/inbox/UnifiedInbox';
 import CallHistory from '../../components/dashboard/CallHistory';
 import FollowUps from '../../components/dashboard/FollowUps';
 
-const socket = io('http://localhost:5000');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
 
 export default function Workspace() {
   const [incomingCall, setIncomingCall] = useState(null);
@@ -64,7 +64,7 @@ export default function Workspace() {
         if (currentStrikes >= 4) {
             // Trigger Admin Alert
             try {
-                await fetch('http://localhost:5000/api/security/idle-alert', {
+                await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/security/idle-alert', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
@@ -110,7 +110,7 @@ export default function Workspace() {
     formData.append('prescription', file);
 
     try {
-      const res = await fetch(`http://localhost:5000/api/patients/${customerId || 'unknown'}/upload`, { method: 'POST', body: formData });
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}` + `/api/patients/${customerId || 'unknown'}/upload`, { method: 'POST', body: formData });
       const data = await res.json();
       alert(`File shipped to cloud storage! URL: ${data.url}`);
     } catch (err) {

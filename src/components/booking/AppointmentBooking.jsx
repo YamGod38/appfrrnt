@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:5000');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
 
 export default function AppointmentBooking({ activeCall }) {
     const [selectedDoctor, setSelectedDoctor] = useState(null);
