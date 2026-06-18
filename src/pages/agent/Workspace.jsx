@@ -1,0 +1,522 @@
+import { useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
+import WebRTCDialer from '../../components/dialer/WebRTCDialer';
+import KnowledgeBase from '../../components/knowledge-base/KnowledgeBase';
+import InteractionTimeline from '../../components/timeline/InteractionTimeline';
+import AppointmentBooking from '../../components/booking/AppointmentBooking';
+import AiSuggest from '../../components/copilot/AiSuggest';
+import UnifiedInbox from '../../components/inbox/UnifiedInbox';
+import CallHistory from '../../components/dashboard/CallHistory';
+import FollowUps from '../../components/dashboard/FollowUps';
+
+const socket = io('http://localhost:5000');
+
+export default function Workspace() {
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCall, setActiveCall] = useState(null); 
+  const [activeTab, setActiveTab] = useState('terminal'); // terminal, operations, inbox
+
+  // Quick Action States
+  const [isMuted, setIsMuted] = useState(false);
+  const [isOnHold, setIsOnHold] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
+
+  useEffect(() => {
+    // Clock in logic
+    const agentName = localStorage.getItem('name') || 'Agent Alpha';
+    socket.emit('AGENT_CLOCK_IN', {
+        agentName: agentName,
+        action: 'Clocked In',
+        timestamp: new Date().toISOString()
+    });
+
+    socket.on('INCOMING_CALL_RINGING', (data) => {
+      setIncomingCall(data);
+      setActiveTab('terminal'); // Auto-switch to terminal on call
+      setTimeout(() => setIncomingCall(null), 30000); // auto-hide
+    });
+
+    return () => {
+      socket.off('INCOMING_CALL_RINGING');
+    };
+  }, []);
+
+  // IDLE TRACKING LOGIC (Phase 7 Security)
+  useEffect(() => {
+    let idleTimer;
+    const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+    
+    const resetIdleTimer = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            handleIdleStrike();
+        }, IDLE_TIMEOUT_MS);
+    };
+
+    const handleIdleStrike = async () => {
+        const currentStrikes = parseInt(localStorage.getItem('idle_strikes') || '0', 10) + 1;
+        localStorage.setItem('idle_strikes', currentStrikes);
+        
+        console.warn(`[Security] Agent Idle Strike: ${currentStrikes}`);
+        
+        if (currentStrikes >= 4) {
+            // Trigger Admin Alert
+            try {
+                await fetch('http://localhost:5000/api/security/idle-alert', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ 
+                        agentName: localStorage.getItem('name') || 'Unknown Agent',
+                        strikes: currentStrikes,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                console.error('[Security] 4th idle strike! Admin notified.');
+                // Reset counter after alerting
+                localStorage.setItem('idle_strikes', '0');
+            } catch (err) {
+                console.error('Failed to send idle alert to server', err);
+            }
+        }
+    };
+
+    // Attach activity listeners
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('keydown', resetIdleTimer);
+    window.addEventListener('click', resetIdleTimer);
+    window.addEventListener('scroll', resetIdleTimer);
+
+    // Initialize first timer
+    resetIdleTimer();
+
+    return () => {
+        clearTimeout(idleTimer);
+        window.removeEventListener('mousemove', resetIdleTimer);
+        window.removeEventListener('keydown', resetIdleTimer);
+        window.removeEventListener('click', resetIdleTimer);
+        window.removeEventListener('scroll', resetIdleTimer);
+    };
+  }, []);
+
+  const handleUpload = async (e, customerId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('prescription', file);
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/patients/${customerId || 'unknown'}/upload`, { method: 'POST', body: formData });
+      const data = await res.json();
+      alert(`File shipped to cloud storage! URL: ${data.url}`);
+    } catch (err) {
+      alert('Upload failed');
+    }
+  };
+
+  const answerCall = () => {
+    setActiveCall(incomingCall);
+    setIncomingCall(null);
+  };
+
+  const endCall = () => {
+    setActiveCall(null);
+  };
+
+  return (
+    <div className="flex flex-col h-full relative z-10 w-full max-w-7xl mx-auto print:h-auto print:block print:overflow-visible">
+        {/* Workspace Sub-Navigation Tabs */}
+        <div className="flex items-center gap-2 border-b border-white/[0.05] pb-4 mb-6 sticky top-0 bg-[#09090b]/90 backdrop-blur-md z-20 overflow-x-auto custom-scrollbar print:hidden">
+            <button 
+                onClick={() => setActiveTab('terminal')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'terminal' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Terminal
+            </button>
+            <button 
+                onClick={() => setActiveTab('operations')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'operations' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Operations
+            </button>
+            <button 
+                onClick={() => setActiveTab('inbox')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'inbox' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Unified Inbox
+            </button>
+            <button 
+                onClick={() => setActiveTab('calls')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'calls' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Calls
+            </button>
+            <button 
+                onClick={() => setActiveTab('followups')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'followups' ? 'bg-pink-500/10 text-pink-400 border border-pink-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Follow Ups
+            </button>
+        </div>
+
+        {/* Tab Content Areas */}
+        <div className="flex-1 min-h-0">
+            
+            {/* TERMINAL TAB: Call handling and Timeline */}
+            {activeTab === 'terminal' && (
+                <div className="grid grid-cols-12 gap-6 h-full animate-in fade-in zoom-in-95 duration-300">
+                    
+                    {/* LEFT COLUMN: Caller Profile & Knowledge Base */}
+                    <div className="col-span-3 flex flex-col gap-6 h-full min-h-0">
+                        {/* Caller Profile Widget */}
+                        <div className="flex-none bg-[#09090b]/80 border border-white/[0.05] rounded-2xl p-5 shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <svg className="w-16 h-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            </div>
+                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Caller Profile</h3>
+                            {activeCall ? (
+                                <div>
+                                    <h4 className="text-xl font-bold text-zinc-100">{activeCall.customerInfo?.full_name || 'Unknown Caller'}</h4>
+                                    <p className="text-xs text-zinc-400 font-mono mt-1">{activeCall.callerNumber}</p>
+                                    
+                                    <div className="mt-4 space-y-3">
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Status</span>
+                                            <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">Premium Patient</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">LTV</span>
+                                            <span className="text-xs font-bold text-zinc-300">$1,240.00</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Next Appt</span>
+                                            <span className="text-xs font-bold text-zinc-300">Oct 24, 2:30 PM</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-6 text-zinc-500">
+                                    <p className="text-xs font-medium">Waiting for incoming call...</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Knowledge Base */}
+                        <div className="flex-1 min-h-0">
+                            <KnowledgeBase />
+                        </div>
+                    </div>
+
+                    {/* MIDDLE COLUMN: Softphone & Quick Actions */}
+                    <div className="col-span-4 flex flex-col gap-6 h-full min-h-0 overflow-y-auto custom-scrollbar pr-2 pb-2">
+                        <div className="flex-none">
+                            <WebRTCDialer />
+                        </div>
+                        
+                        {/* Quick Actions Panel */}
+                        <div className="flex-none bg-[#09090b]/80 border border-white/[0.05] rounded-2xl p-5 shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl relative overflow-hidden">
+                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Quick Actions</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button 
+                                    onClick={() => setShowTransferModal(true)}
+                                    className="bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-emerald-400 py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                    Transfer Call
+                                </button>
+                                <button 
+                                    onClick={() => setIsOnHold(!isOnHold)}
+                                    className={`py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5 ${isOnHold ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-blue-400'}`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    {isOnHold ? 'Resume Call' : 'Put on Hold'}
+                                </button>
+                                <button 
+                                    onClick={() => setIsMuted(!isMuted)}
+                                    className={`py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5 ${isMuted ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' : 'bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-purple-400'}`}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                                    {isMuted ? 'Unmute Line' : 'Mute Line'}
+                                </button>
+                                <button 
+                                    onClick={() => setShowNoteModal(true)}
+                                    className="bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-yellow-400 py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                                    Add Note
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: AI Suggest & Timeline */}
+                    <div className="col-span-5 flex flex-col gap-6 h-full min-h-0">
+                        <div className="flex-[0.8] min-h-0">
+                            <AiSuggest activeCall={activeCall} />
+                        </div>
+                        <div className="flex-[1.2] min-h-0">
+                            <InteractionTimeline activeCall={activeCall} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* OPERATIONS TAB: Appointment Booking */}
+            {activeTab === 'operations' && (
+                <div className="flex gap-6 h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300 print:h-auto print:block print:overflow-visible">
+                    <div className="flex-1 h-full print:h-auto print:block print:overflow-visible">
+                        <AppointmentBooking activeCall={activeCall} />
+                    </div>
+                </div>
+            )}
+
+            {/* INBOX TAB: Full Screen Chat */}
+            {activeTab === 'inbox' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <UnifiedInbox customerPhone={activeCall ? activeCall.callerNumber : null} />
+                </div>
+            )}
+
+            {/* CALLS TAB: Agent Call History */}
+            {activeTab === 'calls' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <CallHistory />
+                </div>
+            )}
+
+            {/* FOLLOW UPS TAB: Agent Scheduled Followups */}
+            {activeTab === 'followups' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <FollowUps />
+                </div>
+            )}
+
+        </div>
+
+        {/* Enhanced Screen Pop Modal */}
+        {incomingCall && (
+            <>
+            {/* High-end dramatic backdrop */}
+            <div className="fixed inset-0 bg-black/85 backdrop-blur-2xl z-40 animate-in fade-in duration-500 flex items-center justify-center">
+                {/* Radial animated glow behind the modal */}
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] animate-pulse pointer-events-none ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}></div>
+            </div>
+
+            <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#050505]/95 border p-8 rounded-[2rem] shadow-[0_0_100px_rgba(0,0,0,0.8),inset_0_0_30px_rgba(255,255,255,0.02)] backdrop-blur-3xl w-[600px] animate-in zoom-in-75 fade-in duration-500 overflow-hidden group ${incomingCall.customerInfo?.vip_status ? 'border-amber-500/30' : 'border-emerald-500/30'}`}>
+                {/* Rotating scanner beam effect */}
+                <div className={`absolute inset-0 bg-[conic-gradient(from_0deg_at_50%_50%,transparent_0deg,rgba(255,255,255,0.05)_360deg)] animate-[spin_4s_linear_infinite] pointer-events-none opacity-50`}></div>
+                
+                {/* Content Container */}
+                <div className="relative z-10">
+                    {/* Header: EKG & VIP Tag */}
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex items-center gap-2">
+                            <span className="relative flex h-3 w-3">
+                                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${incomingCall.customerInfo?.vip_status ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+                                <span className={`relative inline-flex rounded-full h-3 w-3 ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                            </span>
+                            <p className={`text-[10px] uppercase tracking-[0.3em] font-black animate-pulse ${incomingCall.customerInfo?.vip_status ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                Incoming Transmission
+                            </p>
+                        </div>
+                        {incomingCall.customerInfo?.vip_status && (
+                            <div className="bg-amber-500/10 border border-amber-500/50 px-3 py-1 rounded-full flex items-center gap-2 shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse">
+                                <svg className="w-3 h-3 text-amber-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                                <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">{incomingCall.customerInfo?.loyalty_tier || 'VIP'} TIER</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-6 mb-8">
+                        {/* Avatar */}
+                        <div className={`relative w-20 h-20 rounded-2xl flex items-center justify-center border shadow-2xl ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500/10 border-amber-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}>
+                            <span className="text-3xl font-black text-white/50">{incomingCall.customerInfo?.full_name?.charAt(0) || '?'}</span>
+                        </div>
+                        <div>
+                            <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-zinc-100 to-zinc-400 tracking-tight">{incomingCall.customerInfo?.full_name || 'Unknown Entity'}</h3>
+                            <p className="text-sm text-zinc-400 font-mono mt-1">{incomingCall.callerNumber}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        {/* Vital Stats Panel */}
+                        <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 shadow-inner">
+                            <h4 className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-4 border-b border-white/5 pb-2">Patient Demographics</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Age / Gender</span> 
+                                    <span className="text-xs font-bold text-zinc-200">{incomingCall.customerInfo?.age || '--'} YRS / {incomingCall.customerInfo?.gender?.toUpperCase() || 'U'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Entity Type</span> 
+                                    <span className="text-xs font-black text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded uppercase">{incomingCall.customerInfo?.entity_type?.replace('_', ' ') || 'STANDARD'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Last Visit</span> 
+                                    <span className="text-xs font-bold text-zinc-200">{incomingCall.customerInfo?.last_visit ? new Date(incomingCall.customerInfo.last_visit).toLocaleDateString() : 'First Time'}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Medical Profile Panel */}
+                        <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5 shadow-inner">
+                            <h4 className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-4 border-b border-white/5 pb-2">Clinical Profile</h4>
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Condition</span> 
+                                    <span className="text-[10px] font-black text-red-400 bg-red-400/10 px-2 py-0.5 rounded border border-red-500/20">{incomingCall.customerInfo?.primary_condition || 'Undiagnosed'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Specialist</span> 
+                                    <span className="text-xs font-bold text-zinc-200">{incomingCall.customerInfo?.assigned_specialist || 'Unassigned'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Balance</span> 
+                                    <span className="text-xs font-mono font-bold text-zinc-300">{incomingCall.customerInfo?.outstanding_balance || '$0.00'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-8">
+                        <label className={`flex items-center justify-center w-full p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-300 group bg-[#050505]/50 ${incomingCall.customerInfo?.vip_status ? 'border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/10' : 'border-zinc-800 hover:border-emerald-500/50 hover:bg-emerald-500/10'}`}>
+                            <span className="text-xs text-zinc-400 font-bold transition-colors flex items-center gap-2 uppercase tracking-widest">
+                                <svg className={`w-4 h-4 ${incomingCall.customerInfo?.vip_status ? 'text-amber-500 group-hover:text-amber-400' : 'text-emerald-500 group-hover:text-emerald-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                Upload Lab Results / Scans
+                            </span>
+                            <input type="file" className="hidden" onChange={(e) => handleUpload(e, incomingCall.customerInfo?.id)} />
+                        </label>
+                    </div>
+                    
+                    <div className="flex gap-4 relative z-10">
+                        <button className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0 text-zinc-950 ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500 hover:bg-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`} onClick={answerCall}>Engage Comm</button>
+                        <button className="flex-1 bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 border border-white/5 py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0" onClick={() => setIncomingCall(null)}>Disconnect</button>
+                    </div>
+                </div>
+            </div>
+            </>
+        )}
+        
+        {/* Transfer Call Modal */}
+        {showTransferModal && (
+            <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 animate-in fade-in duration-300" onClick={() => setShowTransferModal(false)}></div>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#09090b] border border-white/10 p-8 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] w-[500px] animate-in zoom-in-95 duration-300">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="text-xl font-black text-zinc-100 tracking-tight">Transfer Call</h3>
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">Select Destination</p>
+                    </div>
+                    <button onClick={() => setShowTransferModal(false)} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    {/* Admin / Manager Transfer */}
+                    <div 
+                        onClick={() => {
+                            alert('Call escalated to Manager!');
+                            setShowTransferModal(false);
+                            setActiveCall(null);
+                        }}
+                        className="cursor-pointer bg-gradient-to-r from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 hover:border-amber-500/50 hover:bg-amber-500/20 transition-all group"
+                    >
+                        <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        </div>
+                        <div>
+                            <h4 className="text-amber-400 font-bold flex items-center gap-2 text-sm">Escalate to Manager / Admin <span className="text-[9px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300">PRIORITY</span></h4>
+                            <p className="text-xs text-amber-500/70 font-medium">Bypass queue, direct transfer to shift supervisor.</p>
+                        </div>
+                        <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                        </div>
+                    </div>
+
+                    <div className="h-px w-full bg-white/[0.05] my-4"></div>
+
+                    {/* Agent Transfers */}
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Available Agents</p>
+                    
+                    {[
+                        { name: 'Sarah Jenkins', dept: 'Cardiology', status: 'Available' },
+                        { name: 'David Chen', dept: 'Neurology', status: 'In Call' }
+                    ].map((agent, i) => (
+                        <div 
+                            key={i}
+                            onClick={() => {
+                                if (agent.status === 'Available') {
+                                    alert(`Call transferred to ${agent.name}`);
+                                    setShowTransferModal(false);
+                                    setActiveCall(null);
+                                }
+                            }}
+                            className={`rounded-2xl p-4 flex items-center gap-4 border transition-all ${agent.status === 'Available' ? 'cursor-pointer bg-zinc-900/50 border-white/[0.05] hover:border-emerald-500/30 hover:bg-zinc-800 group' : 'opacity-50 cursor-not-allowed border-transparent bg-zinc-900/30'}`}
+                        >
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400">
+                                {agent.name.charAt(0)}
+                            </div>
+                            <div>
+                                <h4 className="text-zinc-200 font-bold text-sm">{agent.name}</h4>
+                                <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">{agent.dept}</p>
+                            </div>
+                            <div className="ml-auto flex items-center gap-2">
+                                <span className={`text-[10px] font-bold uppercase tracking-widest ${agent.status === 'Available' ? 'text-emerald-400' : 'text-red-400'}`}>{agent.status}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            </>
+        )}
+
+        {/* Add Note Modal */}
+        {showNoteModal && (
+            <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 animate-in fade-in duration-300" onClick={() => setShowNoteModal(false)}></div>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#09090b] border border-white/10 p-8 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] w-[500px] animate-in zoom-in-95 duration-300">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="text-xl font-black text-zinc-100 tracking-tight flex items-center gap-2">
+                            <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                            Add Note
+                        </h3>
+                        <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">Attach to Patient Profile</p>
+                    </div>
+                    <button onClick={() => setShowNoteModal(false)} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div className="space-y-4">
+                    <textarea 
+                        value={noteText}
+                        onChange={(e) => setNoteText(e.target.value)}
+                        placeholder="Type your interaction notes here..."
+                        className="w-full bg-[#050505] text-zinc-100 rounded-2xl p-4 border border-white/5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] transition-all duration-300 focus:outline-none focus:border-yellow-500/50 focus:ring-4 focus:ring-yellow-500/10 min-h-[150px] resize-none"
+                    ></textarea>
+
+                    <button 
+                        onClick={() => {
+                            if (!noteText.trim()) return;
+                            alert('Note saved to profile!');
+                            setNoteText('');
+                            setShowNoteModal(false);
+                        }}
+                        disabled={!noteText.trim()}
+                        className="w-full bg-yellow-500 hover:bg-yellow-400 text-zinc-950 font-black py-4 rounded-xl text-sm uppercase tracking-widest transition-all shadow-[0_6px_0_rgba(161,98,7,1)] active:shadow-none active:translate-y-1.5 disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                        Save Note
+                    </button>
+                </div>
+            </div>
+            </>
+        )}
+    </div>
+  );
+}
