@@ -3,7 +3,7 @@ import { Outlet, Navigate, NavLink, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, PhoneCall, LogOut, ChevronRight, Activity, Stethoscope, Target, Power, Forward, Play, UserCheck, MessageSquare, ClipboardList } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function AdminLayout() {
     const role = localStorage.getItem('role');
@@ -147,9 +147,29 @@ export default function AdminLayout() {
             </aside>
             
             {/* Main Content */}
-            <main className="flex-1 flex flex-col overflow-y-auto relative">
-                {/* Subtle ambient light */}
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
+            <main className={`flex-1 flex flex-col overflow-y-auto relative transition-all duration-700 border-l ${
+                routingState === 'live' ? 'border-emerald-500/20 bg-emerald-950/5' :
+                routingState === 'offline' ? 'border-red-500/20 bg-red-950/5' :
+                'border-blue-500/20 bg-blue-950/5'
+            }`}>
+                {/* Dynamic Ambient Lights */}
+                <div className={`absolute top-0 right-0 w-[800px] h-[800px] rounded-full blur-[120px] pointer-events-none z-0 transition-colors duration-1000 ${
+                    routingState === 'live' ? 'bg-emerald-500/10' :
+                    routingState === 'offline' ? 'bg-red-500/10' :
+                    'bg-blue-500/10'
+                }`}></div>
+                <div className={`absolute bottom-0 left-0 w-[800px] h-[800px] rounded-full blur-[120px] pointer-events-none z-0 transition-colors duration-1000 ${
+                    routingState === 'live' ? 'bg-emerald-500/5' :
+                    routingState === 'offline' ? 'bg-red-500/5' :
+                    'bg-blue-500/5'
+                }`}></div>
+                
+                {/* Full page flash animation on mode change */}
+                <div key={routingState} className={`absolute inset-0 pointer-events-none z-50 animate-in fade-in fade-out duration-1000 ${
+                    routingState === 'live' ? 'bg-emerald-500/10' :
+                    routingState === 'offline' ? 'bg-red-500/10' :
+                    'bg-blue-500/10'
+                }`} style={{ animationFillMode: 'forwards', opacity: 0 }}></div>
                 
                 {/* Global Routing Toggle */}
                 <div className="flex-none p-6 border-b border-white/[0.05] relative z-10 flex justify-end items-center">

@@ -123,14 +123,14 @@ export default function CallLogs() {
                         <input 
                             type="text" 
                             placeholder="Search by ID, Agent, or Number..." 
-                            className="bg-zinc-900/50 text-zinc-100 placeholder-zinc-600 rounded-xl pl-10 pr-4 py-2.5 border border-white/5 focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm w-64"
+                            className="bg-black/20 text-zinc-100 placeholder-zinc-600 rounded-2xl pl-10 pr-4 py-2.5 border border-white/[0.02] shadow-inner backdrop-blur-md focus:outline-none focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all text-sm w-64"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                     <div className="relative">
                         <select 
-                            className="appearance-none bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 pl-10 pr-10 rounded-xl border border-white/5 transition-colors text-sm font-bold focus:outline-none"
+                            className="appearance-none bg-black/20 hover:bg-black/40 shadow-inner backdrop-blur-md text-zinc-300 px-4 py-2.5 pl-10 pr-10 rounded-2xl border border-white/[0.02] transition-colors text-sm font-bold focus:outline-none"
                             value={selectedAgent}
                             onChange={(e) => setSelectedAgent(e.target.value)}
                         >
@@ -143,11 +143,11 @@ export default function CallLogs() {
                     </div>
                     <input 
                         type="date"
-                        className="bg-zinc-900/50 text-zinc-300 rounded-xl px-4 py-2.5 border border-white/5 focus:outline-none focus:border-blue-500/50 text-sm font-bold [color-scheme:dark]"
+                        className="bg-black/20 shadow-inner backdrop-blur-md text-zinc-300 rounded-2xl px-4 py-2.5 border border-white/[0.02] focus:outline-none focus:border-blue-500/50 text-sm font-bold [color-scheme:dark]"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                     />
-                    <button onClick={handleExport} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all active:scale-95 text-sm font-bold">
+                    <button onClick={handleExport} className="flex items-center gap-2 bg-blue-600/90 hover:bg-blue-500 text-white px-4 py-2.5 rounded-2xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all active:scale-95 text-sm font-bold">
                         <Download className="w-4 h-4" /> Export CSV
                     </button>
                 </div>

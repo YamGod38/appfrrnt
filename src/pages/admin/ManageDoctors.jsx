@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { Stethoscope, Activity, CalendarClock, ChevronDown, CheckCircle2, XCircle, Search, UserPlus, Trash2, ShieldAlert } from 'lucide-react';
+import { Stethoscope, Activity, CalendarClock, ChevronDown, CheckCircle2, XCircle, Search, UserPlus, Trash2, ShieldAlert, Plus } from 'lucide-react';
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function ManageDoctors() {
     const [doctors, setDoctors] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
     const [newDoc, setNewDoc] = useState({ name: '', spec: '' });
+    const [scanTypes, setScanTypes] = useState([]);
+    const [newScanName, setNewScanName] = useState('');
+    const [newScanPrep, setNewScanPrep] = useState('');
+    const [newScanDuration, setNewScanDuration] = useState('');
 
     useEffect(() => {
         socket.emit('GET_INITIAL_STATE');
@@ -16,8 +20,13 @@ export default function ManageDoctors() {
             setDoctors(data);
         });
 
+        socket.on('SCAN_TYPES_SYNC', (scans) => {
+            setScanTypes(scans);
+        });
+
         return () => {
             socket.off('DOCTOR_STATUS_SYNC');
+            socket.off('SCAN_TYPES_SYNC');
         };
     }, []);
 
@@ -37,6 +46,23 @@ export default function ManageDoctors() {
         if (confirm("Are you sure you want to remove this doctor from the active roster?")) {
             socket.emit('REMOVE_DOCTOR', id);
         }
+    };
+
+    const handleAddScan = (e) => {
+        e.preventDefault();
+        if (!newScanName) return;
+        socket.emit('ADD_SCAN_TYPE', { 
+            name: newScanName, 
+            prep: newScanPrep || 'No special preparation needed.', 
+            duration: newScanDuration || '30 mins' 
+        });
+        setNewScanName('');
+        setNewScanPrep('');
+        setNewScanDuration('');
+    };
+
+    const handleDeleteScan = (id) => {
+        socket.emit('REMOVE_SCAN_TYPE', id);
     };
 
     const getStatusColor = (status) => {
@@ -87,12 +113,12 @@ export default function ManageDoctors() {
                             placeholder="Search specialist..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-zinc-900 border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600 w-64 shadow-inner"
+                            className="bg-black/20 border border-white/[0.02] shadow-inner backdrop-blur-md rounded-2xl pl-10 pr-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600 w-64"
                         />
                     </div>
                     <button 
                         onClick={() => setShowAddModal(true)}
-                        className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                        className="bg-emerald-500/90 hover:bg-emerald-400 text-zinc-950 font-bold py-2.5 px-5 rounded-2xl flex items-center gap-2 transition-colors shadow-[0_0_20px_rgba(16,185,129,0.2)]"
                     >
                         <UserPlus className="w-4 h-4" /> Add Doctor
                     </button>
@@ -208,6 +234,59 @@ export default function ManageDoctors() {
                         </div>
                     )}
                 </div>
+
+                {/* Diagnostic Scans Manager */}
+                <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden mt-8">
+                    <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-zinc-950/50">
+                        <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-cyan-500" />
+                            Diagnostic Scans Manager
+                        </h3>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20">Live Sync</span>
+                    </div>
+                    <div className="p-6 flex flex-col gap-6">
+                        {/* Add New Scan Form */}
+                        <form onSubmit={handleAddScan} className="flex gap-4 bg-zinc-900/50 p-4 rounded-xl border border-white/5 items-end">
+                            <div className="flex-1">
+                                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5 block">Scan Name</label>
+                                <input type="text" value={newScanName} onChange={e => setNewScanName(e.target.value)} placeholder="e.g. Full Body MRI" className="w-full bg-zinc-950 text-sm text-zinc-300 px-4 py-2.5 rounded-lg border border-white/10 focus:outline-none focus:border-cyan-500/50" required />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5 block">Prep Instructions</label>
+                                <input type="text" value={newScanPrep} onChange={e => setNewScanPrep(e.target.value)} placeholder="e.g. Fasting for 8 hours" className="w-full bg-zinc-950 text-sm text-zinc-300 px-4 py-2.5 rounded-lg border border-white/10 focus:outline-none focus:border-cyan-500/50" />
+                            </div>
+                            <div className="w-32">
+                                <label className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-1.5 block">Duration</label>
+                                <input type="text" value={newScanDuration} onChange={e => setNewScanDuration(e.target.value)} placeholder="e.g. 45 mins" className="w-full bg-zinc-950 text-sm text-zinc-300 px-4 py-2.5 rounded-lg border border-white/10 focus:outline-none focus:border-cyan-500/50" />
+                            </div>
+                            <button type="submit" className="bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2">
+                                <Plus className="w-4 h-4" /> Add
+                            </button>
+                        </form>
+
+                        {/* List of Active Scans */}
+                        <div className="grid grid-cols-2 gap-4">
+                            {scanTypes.map(scan => (
+                                <div key={scan.id} className="bg-zinc-950 border border-white/5 rounded-xl p-4 flex justify-between items-start hover:border-cyan-500/30 transition-colors group">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
+                                            {scan.name}
+                                            <span className="text-[9px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded uppercase tracking-widest">{scan.duration}</span>
+                                        </h4>
+                                        <p className="text-xs text-zinc-500 mt-1.5 line-clamp-1">{scan.prep}</p>
+                                    </div>
+                                    <button onClick={() => handleDeleteScan(scan.id)} className="text-zinc-600 hover:text-red-400 p-1.5 bg-zinc-900 rounded-md transition-colors opacity-0 group-hover:opacity-100">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            {scanTypes.length === 0 && (
+                                <div className="col-span-2 text-center py-8 text-zinc-500 text-sm">No diagnostic scans configured.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
             {/* ADD DOCTOR MODAL */}

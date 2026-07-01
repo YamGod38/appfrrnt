@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react';
 import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function AppointmentBooking({ activeCall }) {
+    const [bookingMode, setBookingMode] = useState('consultation'); // 'consultation' or 'scan'
     const [selectedDoctor, setSelectedDoctor] = useState(null);
+    const [selectedScan, setSelectedScan] = useState(null);
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedTime, setSelectedTime] = useState(null);
     const [status, setStatus] = useState('idle');
     const [doctors, setDoctors] = useState([]);
+    const [scanTypes, setScanTypes] = useState([]);
     const [isSendingWA, setIsSendingWA] = useState(false);
 
     useEffect(() => {
@@ -24,32 +27,71 @@ export default function AppointmentBooking({ activeCall }) {
             });
         });
 
+        socket.on('SCAN_TYPES_SYNC', (scans) => {
+            setScanTypes(scans);
+        });
+
         return () => {
             socket.off('DOCTOR_STATUS_SYNC');
+            socket.off('SCAN_TYPES_SYNC');
         };
     }, []);
 
     const timeSlots = ['09:00 AM', '10:30 AM', '11:00 AM', '01:00 PM', '02:30 PM', '04:00 PM', '05:30 PM'];
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = selectedDate === todayStr;
+
+    const isTimeInPast = (timeStr) => {
+        if (!isToday) return false;
+        const [time, modifier] = timeStr.split(' ');
+        let [hours, minutes] = time.split(':');
+        hours = parseInt(hours, 10);
+        if (hours === 12) {
+            hours = modifier === 'PM' ? 12 : 0;
+        } else if (modifier === 'PM') {
+            hours += 12;
+        }
+        
+        const now = new Date();
+        const slotTime = new Date();
+        slotTime.setHours(hours, parseInt(minutes, 10), 0, 0);
+        
+        return slotTime < now;
+    };
+
     const handleBooking = async (e) => {
         e.preventDefault();
-        if (!selectedDoctor || !selectedDate || !selectedTime) return;
+        if ((bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || !selectedDate || !selectedTime) return;
         setStatus('booking');
         
         // Simulate network request
         setTimeout(() => {
             setStatus('success');
-            const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
             const agentName = localStorage.getItem('name') || 'Agent Alpha';
             const huid = activeCall?.customerInfo?.huid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
-            socket.emit('BOOKING_MADE', {
-                patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
-                huid: huid,
-                doctor: docName,
-                date: selectedDate,
-                time: selectedTime,
-                agentName: agentName
-            });
+            
+            if (bookingMode === 'consultation') {
+                const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
+                socket.emit('BOOKING_MADE', {
+                    patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
+                    huid: huid,
+                    doctor: docName,
+                    date: selectedDate,
+                    time: selectedTime,
+                    agentName: agentName
+                });
+            } else {
+                const scan = scanTypes.find(s => s.id === selectedScan);
+                socket.emit('SCAN_BOOKING_MADE', {
+                    patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
+                    huid: huid,
+                    scanType: scan?.name,
+                    date: selectedDate,
+                    time: selectedTime,
+                    agentName: agentName
+                });
+            }
         }, 2000);
     };
 
@@ -60,13 +102,14 @@ export default function AppointmentBooking({ activeCall }) {
         setIsSendingWA(true);
         try {
             const patientName = activeCall?.customerInfo?.full_name || 'Walk-in Patient';
+            const desc = bookingMode === 'consultation' ? 'Appointment Booking' : 'Diagnostic Scan Booking';
             const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/whatsapp/send-pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type: 'DOCTOR',
                     phone: activeCall.callerNumber,
-                    data: { name: patientName, amount: '0.00', description: 'Appointment Booking' }
+                    data: { name: patientName, amount: '0.00', description: desc }
                 })
             });
             if (res.ok) {
@@ -138,9 +181,19 @@ export default function AppointmentBooking({ activeCall }) {
                                 <p className="text-[10px] font-bold text-blue-400 font-mono mt-1 uppercase tracking-widest print:text-blue-600">HUID: {activeCall?.customerInfo?.huid || 'NEW-REGISTRATION'}</p>
                             </div>
                             <div>
-                                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Specialist</p>
-                                <p className="text-lg font-bold text-emerald-400 print:text-black">{doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned'}</p>
-                                <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest print:text-gray-600">{doctors.find(d => d.id === selectedDoctor)?.spec || 'Specialist'}</p>
+                                {bookingMode === 'consultation' ? (
+                                    <>
+                                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Specialist</p>
+                                        <p className="text-lg font-bold text-emerald-400 print:text-black">{doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned'}</p>
+                                        <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest print:text-gray-600">{doctors.find(d => d.id === selectedDoctor)?.spec || 'Specialist'}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Scan Details</p>
+                                        <p className="text-lg font-bold text-cyan-400 print:text-black">{scanTypes.find(s => s.id === selectedScan)?.name}</p>
+                                        <p className="text-xs font-bold text-amber-400 uppercase mt-1 print:text-orange-600">Prep: {scanTypes.find(s => s.id === selectedScan)?.prep}</p>
+                                    </>
+                                )}
                             </div>
                         </div>
 
@@ -157,7 +210,25 @@ export default function AppointmentBooking({ activeCall }) {
                     </div>
                 ) : (
                     <>
-                    {/* DOCTOR SELECTION */}
+                    {/* BOOKING MODE TOGGLE */}
+                    <div className="flex bg-zinc-900/50 p-1.5 rounded-xl border border-white/5 mb-8 w-full max-w-md mx-auto">
+                        <button 
+                            type="button"
+                            onClick={() => { setBookingMode('consultation'); setSelectedScan(null); }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${bookingMode === 'consultation' ? 'bg-emerald-500 text-zinc-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            Consultation
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => { setBookingMode('scan'); setSelectedDoctor(null); }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${bookingMode === 'scan' ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            Diagnostic Scan
+                        </button>
+                    </div>
+
+                    {bookingMode === 'consultation' ? (
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">1. Select Specialist</label>
@@ -192,13 +263,48 @@ export default function AppointmentBooking({ activeCall }) {
                             )})}
                         </div>
                     </div>
+                    ) : (
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">1. Select Scan Type</label>
+                            {selectedScan && <span className="text-[10px] font-bold text-cyan-400 tracking-widest uppercase bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">Selected</span>}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            {scanTypes.map(scan => (
+                                <div 
+                                    key={scan.id}
+                                    onClick={() => setSelectedScan(scan.id)}
+                                    className={`rounded-2xl p-4 border transition-all duration-300 relative overflow-hidden group/doc cursor-pointer ${selectedScan === scan.id ? 'bg-cyan-500/10 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)] -translate-y-1' : 'bg-zinc-900/50 border-white/[0.05] hover:border-white/20 hover:bg-zinc-800'}`}
+                                >
+                                    {selectedScan === scan.id && <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/20 blur-2xl"></div>}
+                                    <div className="flex items-center gap-3 mb-3 relative z-10">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner transition-colors ${selectedScan === scan.id ? 'bg-cyan-500/20 text-cyan-400' : 'bg-zinc-950 text-zinc-500 group-hover/doc:text-zinc-300'}`}>
+                                            <Activity className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h4 className={`text-sm font-bold transition-colors ${selectedScan === scan.id ? 'text-cyan-50' : 'text-zinc-300'}`}>{scan.name}</h4>
+                                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{scan.duration}</p>
+                                        </div>
+                                    </div>
+                                    <div className="relative z-10 bg-black/20 p-2 rounded-lg border border-white/5">
+                                        <p className="text-[9px] text-amber-500 font-bold uppercase tracking-widest mb-0.5">Prep Instructions:</p>
+                                        <p className="text-xs text-zinc-400">{scan.prep}</p>
+                                    </div>
+                                </div>
+                            ))}
+                            {scanTypes.length === 0 && (
+                                <div className="col-span-2 text-center py-8 text-zinc-500 text-xs uppercase tracking-widest font-bold">No Scans Available</div>
+                            )}
+                        </div>
+                    </div>
+                    )}
 
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.05] to-transparent"></div>
 
                     {/* DATE & TIME SELECTION */}
-                    <div className="grid grid-cols-2 gap-8">
+                    <div className="grid grid-cols-2 gap-8 mt-8">
                         {/* DATE */}
-                        <div className={`transition-opacity duration-300 ${!selectedDoctor ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                        <div className={`transition-opacity duration-300 ${(!selectedDoctor && !selectedScan) ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">2. Choose Date</label>
                             <div className="relative group/input">
                                 <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
@@ -208,7 +314,11 @@ export default function AppointmentBooking({ activeCall }) {
                                     type="date" 
                                     className="w-full bg-zinc-950 text-zinc-100 rounded-2xl pl-14 pr-5 py-5 border border-white/[0.05] shadow-[inset_0_2px_15px_rgba(0,0,0,0.8)] transition-all duration-300 focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 hover:border-white/10 cursor-pointer text-sm font-bold tracking-wide [color-scheme:dark] relative"
                                     value={selectedDate}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    min={todayStr}
+                                    onChange={(e) => {
+                                        setSelectedDate(e.target.value);
+                                        setSelectedTime(null); // Reset time when date changes
+                                    }}
                                 />
                             </div>
                         </div>
@@ -217,16 +327,19 @@ export default function AppointmentBooking({ activeCall }) {
                         <div className={`transition-opacity duration-300 ${!selectedDate ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">3. Available Slots</label>
                             <div className="flex flex-wrap gap-3">
-                                {timeSlots.map(t => (
+                                {timeSlots.map(t => {
+                                    const past = isTimeInPast(t);
+                                    return (
                                     <button
                                         key={t}
                                         type="button"
+                                        disabled={past}
                                         onClick={() => setSelectedTime(t)}
-                                        className={`px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all duration-300 border ${selectedTime === t ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-105' : 'bg-zinc-900 border-white/[0.05] text-zinc-400 hover:border-emerald-500/30 hover:text-emerald-400'}`}
+                                        className={`px-4 py-3 rounded-xl text-xs font-bold tracking-widest transition-all duration-300 border ${past ? 'opacity-20 bg-zinc-900 border-white/[0.02] cursor-not-allowed' : selectedTime === t ? 'bg-emerald-500 text-zinc-950 border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-105' : 'bg-zinc-900 border-white/[0.05] text-zinc-400 hover:border-emerald-500/30 hover:text-emerald-400'}`}
                                     >
                                         {t}
                                     </button>
-                                ))}
+                                )})}
                             </div>
                         </div>
                     </div>
@@ -256,6 +369,7 @@ export default function AppointmentBooking({ activeCall }) {
                             onClick={() => {
                                 setStatus('idle');
                                 setSelectedDoctor(null);
+                                setSelectedScan(null);
                                 setSelectedDate('');
                                 setSelectedTime(null);
                             }}
@@ -267,8 +381,8 @@ export default function AppointmentBooking({ activeCall }) {
                 ) : (
                     <button 
                         onClick={handleBooking}
-                        disabled={!selectedDoctor || !selectedDate || !selectedTime || status === 'booking'}
-                        className={`relative w-full text-white font-black py-5 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none group/btn shadow-[0_8px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-2 ${status === 'booking' ? 'bg-emerald-500/50' : 'bg-zinc-100 text-zinc-950 hover:bg-white'}`}
+                        disabled={(bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || !selectedDate || !selectedTime || status === 'booking'}
+                        className={`relative w-full text-white font-black py-5 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none group/btn shadow-[0_8px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-2 ${status === 'booking' ? (bookingMode === 'scan' ? 'bg-cyan-500/50' : 'bg-emerald-500/50') : 'bg-zinc-100 text-zinc-950 hover:bg-white'}`}
                     >
                         <span className="relative z-10 tracking-[0.2em] uppercase text-sm flex items-center justify-center gap-2">
                             {status === 'booking' ? (

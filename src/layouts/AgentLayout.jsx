@@ -1,8 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { Activity, LogOut, Phone } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function AgentLayout() {
     const role = localStorage.getItem('role');
+    const [agentStatus, setAgentStatus] = useState('Online');
+    const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+
+    const handleStatusChange = (status) => {
+        setAgentStatus(status);
+        setIsStatusMenuOpen(false);
+        socket.emit('AGENT_STATUS_UPDATE', { 
+            id: localStorage.getItem('agentId') || 'agent-1', 
+            name: localStorage.getItem('name') || 'Agent Alpha', 
+            status: status 
+        });
+    };
     
     if (role !== 'AGENT') {
         return <Navigate to="/login" replace />;
@@ -23,9 +39,34 @@ export default function AgentLayout() {
                 </div>
 
                 <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2.5 bg-zinc-950 px-4 py-2 rounded-full border border-white/[0.05] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] animate-pulse"></div>
-                        <span className="text-xs font-bold uppercase tracking-widest text-zinc-300">Ready</span>
+                    <div className="relative">
+                        <button 
+                            onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
+                            className="flex items-center gap-2.5 bg-zinc-950 px-4 py-2 rounded-full border border-white/[0.05] shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] hover:border-white/10 transition-colors"
+                        >
+                            <div className={`w-2 h-2 rounded-full ${agentStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] animate-pulse' : agentStatus === 'Break' ? 'bg-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.8)]' : 'bg-zinc-500 shadow-[0_0_12px_rgba(113,113,122,0.8)]'}`}></div>
+                            <span className="text-zinc-300 text-xs font-bold uppercase tracking-widest">{agentStatus === 'Break' ? 'On Break' : agentStatus}</span>
+                        </button>
+
+                        {isStatusMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsStatusMenuOpen(false)}></div>
+                                <div className="absolute top-full right-0 mt-2 w-40 bg-zinc-950/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-1.5">
+                                        {['Online', 'Break', 'Offline'].map((status) => (
+                                            <button
+                                                key={status}
+                                                onClick={() => handleStatusChange(status)}
+                                                className={`w-full text-left px-4 py-3 text-xs font-bold uppercase tracking-widest transition-all rounded-xl flex items-center gap-3 ${agentStatus === status ? 'bg-white/10 text-white' : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-300'}`}
+                                            >
+                                                <div className={`w-1.5 h-1.5 rounded-full ${status === 'Online' ? 'bg-emerald-500' : status === 'Break' ? 'bg-yellow-500' : 'bg-zinc-500'}`}></div>
+                                                {status === 'Break' ? 'On Break' : status}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                     <button onClick={() => {
                         localStorage.clear();

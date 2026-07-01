@@ -49,6 +49,7 @@ export default function Login() {
                     // Simulate delay for auth animation
                     setTimeout(() => {
                         if (data.role === 'ADMIN') navigate('/admin');
+                        else if (data.role === 'RECEPTION') navigate('/reception');
                         else navigate('/agent');
                     }, 800);
                 } else {
@@ -199,6 +200,7 @@ export default function Login() {
                     <div className="mt-8 text-center text-[10px] text-zinc-600 font-bold uppercase tracking-widest space-y-1">
                         <p className="hover:text-emerald-500/50 transition-colors cursor-default">Demo: admin@apollo.com / admin</p>
                         <p className="hover:text-emerald-500/50 transition-colors cursor-default">Demo: agent@apollo.com / agent</p>
+                        <p className="hover:text-emerald-500/50 transition-colors cursor-default">Demo: reception@apollo.com / reception</p>
                     </div>
                 )}
             </div>

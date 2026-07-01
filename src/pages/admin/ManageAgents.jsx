@@ -37,20 +37,20 @@ export default function ManageAgents() {
                 </div>
                 
                 {/* Tabs */}
-                <div className="flex items-center gap-2 bg-zinc-900/50 p-1.5 rounded-xl border border-white/5 overflow-x-auto">
-                    <button onClick={() => setActiveTab('roster')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'roster' ? 'bg-zinc-800 text-emerald-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <div className="flex items-center gap-2 bg-black/20 p-1.5 rounded-2xl border border-white/[0.02] shadow-inner backdrop-blur-md overflow-x-auto">
+                    <button onClick={() => setActiveTab('roster')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'roster' ? 'bg-zinc-800/80 text-emerald-400 shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}`}>
                         <Activity className="w-4 h-4" /> Live Roster
                     </button>
-                    <button onClick={() => setActiveTab('bookings')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'bookings' ? 'bg-zinc-800 text-amber-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                    <button onClick={() => setActiveTab('bookings')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'bookings' ? 'bg-zinc-800/80 text-amber-400 shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}`}>
                         <Calendar className="w-4 h-4" /> Live Bookings
                     </button>
-                    <button onClick={() => setActiveTab('analytics')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'analytics' ? 'bg-zinc-800 text-blue-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                    <button onClick={() => setActiveTab('analytics')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'analytics' ? 'bg-zinc-800/80 text-blue-400 shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}`}>
                         <Clock className="w-4 h-4" /> Analytics
                     </button>
-                    <button onClick={() => setActiveTab('provisioning')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'provisioning' ? 'bg-zinc-800 text-purple-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                    <button onClick={() => setActiveTab('provisioning')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'provisioning' ? 'bg-zinc-800/80 text-purple-400 shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}`}>
                         <Users className="w-4 h-4" /> Provisioning
                     </button>
-                    <button onClick={() => setActiveTab('reset')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'reset' ? 'bg-zinc-800 text-red-400 shadow-md' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                    <button onClick={() => setActiveTab('reset')} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'reset' ? 'bg-zinc-800/80 text-red-400 shadow-md border border-white/5' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.02]'}`}>
                         <Shield className="w-4 h-4" /> Reset Requests
                         {/* Notification Dot */}
                         <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse ml-1"></span>

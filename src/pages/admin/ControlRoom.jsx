@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { Phone, CalendarCheck, Clock, ShieldCheck, UserCheck, Activity, ChevronRight } from 'lucide-react';
+import { Phone, CalendarCheck, Clock, ShieldCheck, UserCheck, Activity, ChevronRight, Bell, Send } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import AgentStatusWidget from '../../components/agents/AgentStatusWidget';
 
@@ -13,11 +14,13 @@ const mockChartData = [
   { time: '18:00', inbound: 23, outbound: 12 }
 ];
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function ControlRoom() {
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [recentBookings, setRecentBookings] = useState([]);
+    const [memoInput, setMemoInput] = useState('');
+    const navigate = useNavigate();
 
     useEffect(() => {
         socket.emit('GET_INITIAL_STATE');
@@ -129,8 +132,37 @@ export default function ControlRoom() {
                 </div>
             </div>
 
+            {/* Admin Quick Actions */}
+            <div className="grid grid-cols-1 mt-2">
+                <div className="bg-[#09090b]/80 p-4 rounded-2xl border border-amber-500/20 shadow-[0_10px_30px_-15px_rgba(245,158,11,0.2)] backdrop-blur-xl flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/20">
+                        <Bell className="w-5 h-5 text-amber-500" />
+                    </div>
+                    <div className="flex-1">
+                        <input 
+                            type="text"
+                            placeholder="Type a memo to broadcast live to the Reception Portal..."
+                            value={memoInput}
+                            onChange={(e) => setMemoInput(e.target.value)}
+                            className="w-full bg-zinc-950 border border-white/[0.05] shadow-inner rounded-xl px-4 py-2.5 text-sm text-zinc-200 focus:outline-none focus:border-amber-500/50 transition-colors"
+                        />
+                    </div>
+                    <button 
+                        onClick={() => {
+                            if (!memoInput) return;
+                            socket.emit('UPDATE_ADMIN_MEMO', memoInput);
+                            setMemoInput('');
+                        }}
+                        disabled={!memoInput}
+                        className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:hover:bg-amber-500 text-zinc-950 font-bold px-6 py-2.5 rounded-xl transition-all shadow-[0_5px_0_rgba(217,119,6,1)] active:shadow-none active:translate-y-1 text-sm flex items-center gap-2 shrink-0 disabled:active:translate-y-0 disabled:active:shadow-[0_5px_0_rgba(217,119,6,1)]"
+                    >
+                        <Send className="w-4 h-4" /> Broadcast Memo
+                    </button>
+                </div>
+            </div>
+
             {/* Bottom Split View */}
-            <div className="flex-1 grid grid-cols-2 gap-6 mt-4 min-h-0">
+            <div className="flex-1 grid grid-cols-2 gap-6 mt-2 min-h-0">
                 
                 {/* Live Bookings Feed */}
                 <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden">
@@ -214,7 +246,7 @@ export default function ControlRoom() {
                             <Phone className="w-5 h-5 text-zinc-500" />
                             Recent Call Logs
                         </h3>
-                        <button className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1">View All <ChevronRight className="w-3 h-3" /></button>
+                        <button onClick={() => navigate('/admin/logs')} className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1">View All <ChevronRight className="w-3 h-3" /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse">

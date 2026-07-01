@@ -12,7 +12,7 @@ import FollowUps from '../../components/dashboard/FollowUps';
 import AgentLeads from '../../components/dashboard/AgentLeads';
 import WhatsappDashboard from '../admin/WhatsappDashboard';
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function Workspace() {
   const [incomingCall, setIncomingCall] = useState(null);
@@ -246,19 +246,6 @@ export default function Workspace() {
             >
                 WhatsApp
             </button>
-            
-            <div className="ml-auto flex items-center gap-3">
-                <div className={`w-2.5 h-2.5 rounded-full ${agentStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : agentStatus === 'Break' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-zinc-500'}`}></div>
-                <select 
-                    value={agentStatus} 
-                    onChange={handleStatusChange}
-                    className="bg-zinc-900 border border-white/[0.05] text-zinc-300 text-xs font-bold uppercase tracking-widest rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500/50 appearance-none cursor-pointer"
-                >
-                    <option value="Online">Online</option>
-                    <option value="Break">On Break</option>
-                    <option value="Offline">Offline</option>
-                </select>
-            </div>
         </div>
 
         {/* Tab Content Areas */}
