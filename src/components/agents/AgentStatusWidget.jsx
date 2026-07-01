@@ -13,8 +13,9 @@ export default function AgentStatusWidget({ socket }) {
 
     const getStatusColor = (status) => {
         switch(status) {
-            case 'Available': return 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
-            case 'On Call': return 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]';
+            case 'Online': return 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]';
+            case 'Break': return 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.6)]';
+            case 'Offline': return 'bg-zinc-600';
             default: return 'bg-zinc-600';
         }
     };

@@ -4,10 +4,13 @@ import WebRTCDialer from '../../components/dialer/WebRTCDialer';
 import KnowledgeBase from '../../components/knowledge-base/KnowledgeBase';
 import InteractionTimeline from '../../components/timeline/InteractionTimeline';
 import AppointmentBooking from '../../components/booking/AppointmentBooking';
+import HotelBooking from '../../components/booking/HotelBooking';
 import AiSuggest from '../../components/copilot/AiSuggest';
 import UnifiedInbox from '../../components/inbox/UnifiedInbox';
 import CallHistory from '../../components/dashboard/CallHistory';
 import FollowUps from '../../components/dashboard/FollowUps';
+import AgentLeads from '../../components/dashboard/AgentLeads';
+import WhatsappDashboard from '../admin/WhatsappDashboard';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
 
@@ -22,6 +25,17 @@ export default function Workspace() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [agentStatus, setAgentStatus] = useState('Online');
+  
+  // Feedback Toast State
+  const [feedbackToast, setFeedbackToast] = useState(null);
+
+  // Missed Call Popup State
+  const [missedCallPrompt, setMissedCallPrompt] = useState(null);
+  
+  // Follow Up Modal State
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleData, setScheduleData] = useState({ date: '', time: '' });
 
   useEffect(() => {
     // Clock in logic
@@ -31,6 +45,9 @@ export default function Workspace() {
         action: 'Clocked In',
         timestamp: new Date().toISOString()
     });
+    
+    // Set initial status to Online
+    socket.emit('UPDATE_AGENT_STATUS', { name: agentName, status: 'Online' });
 
     socket.on('INCOMING_CALL_RINGING', (data) => {
       setIncomingCall(data);
@@ -38,8 +55,19 @@ export default function Workspace() {
       setTimeout(() => setIncomingCall(null), 30000); // auto-hide
     });
 
+    socket.on('FEEDBACK_RECEIVED', (data) => {
+        setFeedbackToast(data);
+        setTimeout(() => setFeedbackToast(null), 5000);
+    });
+
+    socket.on('MISSED_CALL_ALERT', (data) => {
+        // We could show a toast here, but the instruction is to pop when they finish a call.
+    });
+
     return () => {
       socket.off('INCOMING_CALL_RINGING');
+      socket.off('FEEDBACK_RECEIVED');
+      socket.off('MISSED_CALL_ALERT');
     };
   }, []);
 
@@ -123,8 +151,47 @@ export default function Workspace() {
     setIncomingCall(null);
   };
 
-  const endCall = () => {
+  const endCall = async () => {
     setActiveCall(null);
+    // When finishing a call, check for missed calls in the queue
+    try {
+        const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/next-missed');
+        const data = await res.json();
+        if (data.success && data.data) {
+            setMissedCallPrompt(data.data);
+        }
+    } catch (err) {
+        console.error('Failed to fetch next missed call', err);
+    }
+  };
+
+  const handleScheduleCall = async () => {
+      if (!scheduleData.date || !scheduleData.time) return;
+      try {
+          const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/schedule', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  patient_name: activeCall?.customerInfo?.full_name || 'Unknown Patient',
+                  phone: activeCall?.callerNumber || 'Unknown',
+                  agent_name: localStorage.getItem('name') || 'Agent Alpha',
+                  scheduled_time: `${scheduleData.date}T${scheduleData.time}:00Z`
+              })
+          });
+          if (res.ok) {
+              alert('Follow-up call scheduled successfully!');
+              setShowScheduleModal(false);
+          }
+      } catch (err) {
+          alert('Failed to schedule call');
+      }
+  };
+
+  const handleStatusChange = (e) => {
+      const newStatus = e.target.value;
+      setAgentStatus(newStatus);
+      const agentName = localStorage.getItem('name') || 'Agent Alpha';
+      socket.emit('UPDATE_AGENT_STATUS', { name: agentName, status: newStatus });
   };
 
   return (
@@ -141,7 +208,13 @@ export default function Workspace() {
                 onClick={() => setActiveTab('operations')}
                 className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'operations' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
             >
-                Operations
+                Appointments
+            </button>
+            <button 
+                onClick={() => setActiveTab('hotels')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'hotels' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Hotels
             </button>
             <button 
                 onClick={() => setActiveTab('inbox')}
@@ -161,6 +234,31 @@ export default function Workspace() {
             >
                 Follow Ups
             </button>
+            <button 
+                onClick={() => setActiveTab('leads')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'leads' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Leads
+            </button>
+            <button 
+                onClick={() => setActiveTab('whatsapp')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'whatsapp' ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                WhatsApp
+            </button>
+            
+            <div className="ml-auto flex items-center gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${agentStatus === 'Online' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : agentStatus === 'Break' ? 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.8)]' : 'bg-zinc-500'}`}></div>
+                <select 
+                    value={agentStatus} 
+                    onChange={handleStatusChange}
+                    className="bg-zinc-900 border border-white/[0.05] text-zinc-300 text-xs font-bold uppercase tracking-widest rounded-lg px-3 py-1.5 focus:outline-none focus:border-emerald-500/50 appearance-none cursor-pointer"
+                >
+                    <option value="Online">Online</option>
+                    <option value="Break">On Break</option>
+                    <option value="Offline">Offline</option>
+                </select>
+            </div>
         </div>
 
         {/* Tab Content Areas */}
@@ -184,6 +282,10 @@ export default function Workspace() {
                                     <p className="text-xs text-zinc-400 font-mono mt-1">{activeCall.callerNumber}</p>
                                     
                                     <div className="mt-4 space-y-3">
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">HUID</span>
+                                            <span className="text-xs font-bold text-blue-400 font-mono bg-blue-400/10 px-2 py-0.5 rounded">{activeCall.customerInfo?.huid || 'Unregistered'}</span>
+                                        </div>
                                         <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Status</span>
                                             <span className="text-xs font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">Premium Patient</span>
@@ -229,11 +331,11 @@ export default function Workspace() {
                                     Transfer Call
                                 </button>
                                 <button 
-                                    onClick={() => setIsOnHold(!isOnHold)}
-                                    className={`py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5 ${isOnHold ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-blue-400'}`}
+                                    onClick={() => setShowScheduleModal(true)}
+                                    className="bg-zinc-900/80 hover:bg-zinc-800 border border-white/[0.05] text-zinc-300 hover:text-blue-400 py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2 shadow-[0_6px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-1.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    {isOnHold ? 'Resume Call' : 'Put on Hold'}
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    Schedule Follow-Up
                                 </button>
                                 <button 
                                     onClick={() => setIsMuted(!isMuted)}
@@ -248,6 +350,13 @@ export default function Workspace() {
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
                                     Add Note
+                                </button>
+                                <button 
+                                    onClick={endCall}
+                                    className="col-span-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 py-4 rounded-xl text-xs font-bold uppercase tracking-widest transition-all flex flex-col items-center gap-2"
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" /></svg>
+                                    End Call
                                 </button>
                             </div>
                         </div>
@@ -274,6 +383,15 @@ export default function Workspace() {
                 </div>
             )}
 
+            {/* HOTELS TAB: Hotel Booking */}
+            {activeTab === 'hotels' && (
+                <div className="flex gap-6 h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300 print:h-auto print:block print:overflow-visible">
+                    <div className="flex-1 h-full print:h-auto print:block print:overflow-visible">
+                        <HotelBooking activeCall={activeCall} />
+                    </div>
+                </div>
+            )}
+
             {/* INBOX TAB: Full Screen Chat */}
             {activeTab === 'inbox' && (
                 <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
@@ -292,6 +410,20 @@ export default function Workspace() {
             {activeTab === 'followups' && (
                 <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
                     <FollowUps />
+                </div>
+            )}
+
+            {/* LEADS TAB: Agent Leads Pipeline */}
+            {activeTab === 'leads' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <AgentLeads />
+                </div>
+            )}
+
+            {/* WHATSAPP TAB: Agent Whatsapp Dashboard */}
+            {activeTab === 'whatsapp' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <WhatsappDashboard />
                 </div>
             )}
 
@@ -393,8 +525,17 @@ export default function Workspace() {
                     </div>
                     
                     <div className="flex gap-4 relative z-10">
-                        <button className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0 text-zinc-950 ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500 hover:bg-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`} onClick={answerCall}>Engage Comm</button>
-                        <button className="flex-1 bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 border border-white/5 py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0" onClick={() => setIncomingCall(null)}>Disconnect</button>
+                        <button className={`flex-[1.5] py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0 text-zinc-950 ${incomingCall.customerInfo?.vip_status ? 'bg-amber-500 hover:bg-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.3)]' : 'bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.3)]'}`} onClick={answerCall}>Engage Comm</button>
+                        <button 
+                            className="flex-1 bg-zinc-900 hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30 text-zinc-400 border border-white/5 py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0" 
+                            onClick={() => {
+                                alert('Call forcibly escalated to Admin Override.');
+                                setIncomingCall(null);
+                            }}
+                        >
+                            Escalate Admin
+                        </button>
+                        <button className="flex-1 bg-zinc-900 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 text-zinc-400 border border-white/5 py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0" onClick={() => setIncomingCall(null)}>Disconnect</button>
                     </div>
                 </div>
             </div>
@@ -517,6 +658,95 @@ export default function Workspace() {
             </div>
             </>
         )}
+
+        {/* Real-time Feedback Toast */}
+        {feedbackToast && (
+            <div className="fixed bottom-6 right-6 z-50 bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl shadow-[0_10px_30px_rgba(16,185,129,0.2)] backdrop-blur-md animate-in slide-in-from-bottom-5 fade-in duration-300 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path></svg>
+                </div>
+                <div>
+                    <h4 className="text-emerald-400 font-bold text-sm">New 5-Star Feedback!</h4>
+                    <p className="text-xs text-zinc-400">Patient <span className="font-mono text-zinc-300">{feedbackToast.patientNumber}</span> gave you {feedbackToast.rating} stars.</p>
+                </div>
+            </div>
+        )}
+
+        {/* Schedule Follow-up Modal */}
+        {showScheduleModal && (
+            <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 animate-in fade-in duration-300" onClick={() => setShowScheduleModal(false)}></div>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#09090b] border border-white/10 p-8 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] w-[400px] animate-in zoom-in-95 duration-300">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <h3 className="text-xl font-black text-zinc-100 tracking-tight">Schedule Callback</h3>
+                    </div>
+                    <button onClick={() => setShowScheduleModal(false)} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-2">Date</label>
+                        <input type="date" className="w-full bg-zinc-900 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500" value={scheduleData.date} onChange={e => setScheduleData({...scheduleData, date: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-2">Time (UTC)</label>
+                        <input type="time" className="w-full bg-zinc-900 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500" value={scheduleData.time} onChange={e => setScheduleData({...scheduleData, time: e.target.value})} />
+                    </div>
+                    <button onClick={handleScheduleCall} className="w-full bg-blue-500 hover:bg-blue-400 text-zinc-950 font-black py-4 rounded-xl text-sm uppercase tracking-widest transition-all shadow-[0_6px_0_rgba(29,78,216,1)] active:shadow-none active:translate-y-1.5 mt-4">
+                        Confirm Schedule
+                    </button>
+                </div>
+            </div>
+            </>
+        )}
+
+        {/* Missed Call Prompt Modal */}
+        {missedCallPrompt && (
+            <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 animate-in fade-in duration-300"></div>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#09090b] border border-orange-500/30 p-8 rounded-3xl shadow-[0_0_50px_rgba(249,115,22,0.2)] w-[450px] animate-in zoom-in-95 duration-300">
+                <div className="flex flex-col items-center text-center">
+                    <div className="w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400 mb-6 shadow-[0_0_20px_rgba(249,115,22,0.3)]">
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7h6m-3-3v6" /></svg>
+                    </div>
+                    <h3 className="text-2xl font-black text-white tracking-tight mb-2">Missed Call Alert</h3>
+                    <p className="text-zinc-400 text-sm mb-8">A caller was placed in the queue while you were busy. Please return their call immediately.</p>
+                    
+                    <div className="bg-zinc-900/80 w-full p-4 rounded-xl border border-white/5 mb-8">
+                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Callback Number</p>
+                        <p className="text-xl font-mono font-bold text-zinc-200">{missedCallPrompt.phone}</p>
+                    </div>
+
+                    <div className="flex gap-4 w-full">
+                        <button onClick={() => {
+                            // Dial logic here
+                            alert(`Dialing ${missedCallPrompt.phone}...`);
+                            setMissedCallPrompt(null);
+                        }} className="flex-1 bg-orange-500 hover:bg-orange-400 text-zinc-950 font-black py-4 rounded-xl text-sm uppercase tracking-widest transition-all shadow-[0_6px_0_rgba(194,65,12,1)] active:shadow-none active:translate-y-1.5">
+                            Dial Now
+                        </button>
+                        <button onClick={() => setMissedCallPrompt(null)} className="px-6 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 border border-white/5 py-4 rounded-xl text-sm font-black uppercase tracking-widest transition-all">
+                            Skip
+                        </button>
+                    </div>
+                </div>
+            </div>
+            </>
+        )}
+
+        {/* Floating Help Button */}
+        <button 
+            onClick={() => alert("UNIVERSAL WORKSPACE HELP\n\n1. Active Call: Take calls in the Terminal tab. Mute, transfer, or end calls using the big buttons.\n2. Screen Pop: When a call connects, caller details pop up automatically. Click 'Accept' to view their full profile.\n3. Missed Calls: When you finish an active call, the system will automatically prompt you if there's a caller waiting in the queue.\n4. WhatsApp Center: Use the WhatsApp tab to view automated messages. In the Leads tab, click the Document icon to send Medical Bills directly via WhatsApp.\n5. Follow Ups: Scheduled callbacks appear in the Follow Ups tab. Click 'Resolve' once you complete them.\n6. Status: Keep your status updated (Online/Break) using the dropdown in the top right to control call routing.")}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-zinc-800 border border-white/10 rounded-full flex items-center justify-center text-zinc-400 opacity-50 hover:opacity-100 hover:bg-zinc-700 hover:text-white transition-all shadow-lg z-50 group"
+            title="Help & Information"
+        >
+            <span className="font-bold text-xl">?</span>
+            <span className="absolute right-16 bg-zinc-900 border border-white/10 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity">
+                How things work
+            </span>
+        </button>
     </div>
   );
 }

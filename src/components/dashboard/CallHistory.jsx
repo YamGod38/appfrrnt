@@ -1,6 +1,9 @@
-import { PhoneIncoming, PhoneOutgoing, PhoneMissed, Clock, CheckCircle2, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { PhoneIncoming, PhoneOutgoing, PhoneMissed, Clock, CheckCircle2, ChevronDown, ChevronUp, Bot, PhoneCall } from 'lucide-react';
 
 export default function CallHistory() {
+    const [expandedLog, setExpandedLog] = useState(null);
+    const [aiSummary, setAiSummary] = useState({});
     const mockCalls = [
         { id: 1, type: 'incoming', number: '+1 (555) 019-2834', status: 'completed', duration: '05:23', time: '10:45 AM', date: 'Today', agent: 'Sarah Jenkins' },
         { id: 2, type: 'outgoing', number: '+1 (555) 832-1192', status: 'completed', duration: '12:01', time: '09:15 AM', date: 'Today', agent: 'Sarah Jenkins' },
@@ -15,6 +18,28 @@ export default function CallHistory() {
             case 'outgoing': return <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400"><PhoneOutgoing className="w-4 h-4" /></div>;
             case 'missed': return <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-400"><PhoneMissed className="w-4 h-4" /></div>;
             default: return null;
+        }
+    };
+
+    const handleExpand = async (logId) => {
+        if (expandedLog === logId) {
+            setExpandedLog(null);
+            return;
+        }
+        setExpandedLog(logId);
+        
+        if (!aiSummary[logId]) {
+            try {
+                // Mock log IDs need 'CALL-' prefix to mimic db format or pass as is
+                const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/ai/summarize/CALL-${logId}`);
+                const data = await res.json();
+                if (data.success) {
+                    setAiSummary(prev => ({ ...prev, [logId]: data.data.summary }));
+                }
+            } catch (err) {
+                console.error('Failed to fetch summary');
+                setAiSummary(prev => ({ ...prev, [logId]: 'Failed to generate AI Summary.' }));
+            }
         }
     };
 
@@ -44,7 +69,8 @@ export default function CallHistory() {
                     </thead>
                     <tbody>
                         {mockCalls.map((call, idx) => (
-                            <tr key={call.id} className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group/row">
+                            <React.Fragment key={call.id}>
+                            <tr className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group/row">
                                 <td className="px-6 py-4">{getIcon(call.type)}</td>
                                 <td className="px-6 py-4">
                                     <span className="text-sm font-bold text-zinc-200 font-mono tracking-tight">{call.number}</span>
@@ -59,17 +85,60 @@ export default function CallHistory() {
                                     <span className="text-sm font-mono text-zinc-400">{call.duration}</span>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    {call.status === 'completed' ? (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
-                                            <CheckCircle2 className="w-3 h-3" /> Completed
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest">
-                                            Missed
-                                        </span>
-                                    )}
+                                    <div className="flex items-center justify-end gap-3">
+                                        {call.status === 'completed' ? (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-widest">
+                                                <CheckCircle2 className="w-3 h-3" /> Completed
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-widest">
+                                                Missed
+                                            </span>
+                                        )}
+                                        <button 
+                                            onClick={() => alert(`Dialing callback for ${call.number}...`)}
+                                            className="p-1.5 rounded-md text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors"
+                                            title="Callback"
+                                        >
+                                            <PhoneCall className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleExpand(call.id)}
+                                            className={`p-1.5 rounded-md transition-colors ${expandedLog === call.id ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-500 hover:text-blue-400 hover:bg-zinc-800'}`}
+                                            title="AI Summary"
+                                        >
+                                            {expandedLog === call.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
+                            {expandedLog === call.id && (
+                                <tr className="bg-blue-500/[0.02] border-b border-white/[0.05]">
+                                    <td colSpan="5" className="px-6 py-6">
+                                        <div className="flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                                                <Bot className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-blue-400 font-bold text-sm mb-2 uppercase tracking-widest flex items-center gap-2">
+                                                    AI Call Summary
+                                                </h4>
+                                                {aiSummary[call.id] ? (
+                                                    <p className="text-zinc-300 text-sm leading-relaxed max-w-4xl">
+                                                        {aiSummary[call.id]}
+                                                    </p>
+                                                ) : (
+                                                    <div className="flex items-center gap-3 text-zinc-500 text-sm">
+                                                        <div className="w-4 h-4 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                                                        Generating summary...
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                            </React.Fragment>
                         ))}
                     </tbody>
                 </table>

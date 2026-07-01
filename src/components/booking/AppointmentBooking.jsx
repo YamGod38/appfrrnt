@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
@@ -10,6 +10,7 @@ export default function AppointmentBooking({ activeCall }) {
     const [selectedTime, setSelectedTime] = useState(null);
     const [status, setStatus] = useState('idle');
     const [doctors, setDoctors] = useState([]);
+    const [isSendingWA, setIsSendingWA] = useState(false);
 
     useEffect(() => {
         socket.emit('GET_INITIAL_STATE');
@@ -40,14 +41,45 @@ export default function AppointmentBooking({ activeCall }) {
             setStatus('success');
             const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
             const agentName = localStorage.getItem('name') || 'Agent Alpha';
+            const huid = activeCall?.customerInfo?.huid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
             socket.emit('BOOKING_MADE', {
                 patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
+                huid: huid,
                 doctor: docName,
                 date: selectedDate,
                 time: selectedTime,
                 agentName: agentName
             });
         }, 2000);
+    };
+
+    const handleWhatsAppSend = async () => {
+        if (!activeCall?.callerNumber) {
+            return alert("No phone number linked to this call.");
+        }
+        setIsSendingWA(true);
+        try {
+            const patientName = activeCall?.customerInfo?.full_name || 'Walk-in Patient';
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/whatsapp/send-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'DOCTOR',
+                    phone: activeCall.callerNumber,
+                    data: { name: patientName, amount: '0.00', description: 'Appointment Booking' }
+                })
+            });
+            if (res.ok) {
+                alert('Booking slip sent via WhatsApp successfully!');
+            } else {
+                alert('Failed to send WhatsApp message.');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error sending WhatsApp message.');
+        } finally {
+            setIsSendingWA(false);
+        }
     };
 
     return (
@@ -103,6 +135,7 @@ export default function AppointmentBooking({ activeCall }) {
                                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Patient Details</p>
                                 <p className="text-lg font-bold text-zinc-100 print:text-black">{activeCall?.customerInfo?.full_name || 'Walk-in Patient'}</p>
                                 <p className="text-sm font-mono text-zinc-400 print:text-gray-600">{activeCall?.callerNumber || '+1 (555) 000-0000'}</p>
+                                <p className="text-[10px] font-bold text-blue-400 font-mono mt-1 uppercase tracking-widest print:text-blue-600">HUID: {activeCall?.customerInfo?.huid || 'NEW-REGISTRATION'}</p>
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Specialist</p>
@@ -207,9 +240,17 @@ export default function AppointmentBooking({ activeCall }) {
                     <div className="flex gap-4">
                         <button 
                             onClick={() => window.print()}
-                            className="flex-1 bg-zinc-100 text-zinc-950 font-black py-5 rounded-2xl transition-all duration-300 hover:bg-white hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] tracking-[0.2em] uppercase text-sm flex items-center justify-center gap-2 active:scale-95"
+                            className="flex-1 bg-zinc-100 text-zinc-950 font-black py-5 rounded-2xl transition-all duration-300 hover:bg-white hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] tracking-[0.2em] uppercase text-xs flex items-center justify-center gap-2 active:scale-95"
                         >
                             Print Slip
+                        </button>
+                        <button 
+                            onClick={handleWhatsAppSend}
+                            disabled={isSendingWA}
+                            className="flex-1 bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 font-black py-5 rounded-2xl transition-all duration-300 hover:bg-[#25D366]/20 hover:shadow-[0_0_30px_rgba(37,211,102,0.2)] tracking-[0.2em] uppercase text-xs flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            {isSendingWA ? 'Sending...' : 'WA Send'}
                         </button>
                         <button 
                             onClick={() => {
@@ -218,7 +259,7 @@ export default function AppointmentBooking({ activeCall }) {
                                 setSelectedDate('');
                                 setSelectedTime(null);
                             }}
-                            className="flex-1 bg-zinc-900 text-zinc-400 border border-white/10 font-bold py-5 rounded-2xl transition-all duration-300 hover:bg-zinc-800 hover:text-white tracking-[0.2em] uppercase text-sm flex items-center justify-center gap-2 active:scale-95"
+                            className="flex-1 bg-zinc-900 text-zinc-400 border border-white/10 font-bold py-5 rounded-2xl transition-all duration-300 hover:bg-zinc-800 hover:text-white tracking-[0.2em] uppercase text-xs flex items-center justify-center gap-2 active:scale-95"
                         >
                             New Booking
                         </button>

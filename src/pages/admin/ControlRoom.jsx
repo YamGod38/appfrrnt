@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Phone, CalendarCheck, Clock, ShieldCheck, UserCheck, Activity, ChevronRight } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import AgentStatusWidget from '../../components/agents/AgentStatusWidget';
+
+const mockChartData = [
+  { time: '08:00', inbound: 12, outbound: 5 },
+  { time: '10:00', inbound: 45, outbound: 22 },
+  { time: '12:00', inbound: 67, outbound: 34 },
+  { time: '14:00', inbound: 32, outbound: 18 },
+  { time: '16:00', inbound: 89, outbound: 55 },
+  { time: '18:00', inbound: 23, outbound: 12 }
+];
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '');
 
@@ -46,7 +56,7 @@ export default function ControlRoom() {
             </header>
 
             <div className="grid grid-cols-4 gap-6">
-                <div className="bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
+                <div className="h-[160px] bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col justify-center">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Phone className="w-20 h-20 text-emerald-500 -rotate-12" />
                     </div>
@@ -59,7 +69,7 @@ export default function ControlRoom() {
                     <h3 className="text-5xl font-bold text-zinc-100 font-mono tracking-tight group-hover:text-emerald-400 transition-colors">1</h3>
                 </div>
 
-                <div className="bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
+                <div className="h-[160px] bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col justify-center">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <CalendarCheck className="w-20 h-20 text-blue-500 rotate-12" />
                     </div>
@@ -72,7 +82,7 @@ export default function ControlRoom() {
                     <h3 className="text-5xl font-bold text-zinc-100 font-mono tracking-tight group-hover:text-blue-400 transition-colors">{recentBookings.length}</h3>
                 </div>
 
-                <div className="bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden">
+                <div className="h-[160px] bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col justify-center">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <Clock className="w-20 h-20 text-purple-500 -rotate-12" />
                     </div>
@@ -86,11 +96,11 @@ export default function ControlRoom() {
                 </div>
 
                 {/* Agent Attendance Log Widget */}
-                <div className="bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col">
+                <div className="h-[160px] bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl transform transition-all duration-300 hover:-translate-y-1 group relative overflow-hidden flex flex-col">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
                         <UserCheck className="w-20 h-20 text-emerald-500 rotate-12" />
                     </div>
-                    <div className="flex items-center justify-between mb-4 relative z-10">
+                    <div className="flex items-center justify-between mb-4 relative z-10 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
                                 <UserCheck className="w-4 h-4 text-emerald-400" />
@@ -163,8 +173,42 @@ export default function ControlRoom() {
                     </div>
                 </div>
 
-                {/* Global Call Logs (Condensed) */}
+                {/* Call Volume Trends Chart */}
                 <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden">
+                    <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-zinc-950/50">
+                        <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-emerald-500" />
+                            Call Volume Trends (Today)
+                        </h3>
+                    </div>
+                    <div className="flex-1 p-6 h-full min-h-[250px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={mockChartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorInbound" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                    <linearGradient id="colorOutbound" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <XAxis dataKey="time" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#09090b', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                    itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                                />
+                                <Area type="monotone" dataKey="inbound" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorInbound)" />
+                                <Area type="monotone" dataKey="outbound" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorOutbound)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Global Call Logs (Condensed) */}
+                <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden col-span-2">
                     <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-zinc-950/50">
                         <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
                             <Phone className="w-5 h-5 text-zinc-500" />

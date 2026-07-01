@@ -1,12 +1,38 @@
 import { CalendarClock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 export default function FollowUps() {
-    const mockTasks = [
-        { id: 1, type: 'callback', patient: 'Michael Chang', number: '+1 (555) 123-0099', time: 'Today, 2:30 PM', priority: 'high', status: 'pending', notes: 'Check if fever subsided after prescribed antibiotics.' },
-        { id: 2, type: 'booking', patient: 'Emma Watson', number: '+1 (555) 882-3341', time: 'Today, 4:00 PM', priority: 'medium', status: 'pending', notes: 'Needs to reschedule cardiology appointment.' },
-        { id: 3, type: 'document', patient: 'David Smith', number: '+1 (555) 991-2233', time: 'Tomorrow, 10:00 AM', priority: 'low', status: 'pending', notes: 'Missing insurance documents for surgery prep.' },
-        { id: 4, type: 'callback', patient: 'Sarah Connor', number: '+1 (555) 777-8888', time: 'Yesterday', priority: 'high', status: 'completed', notes: 'Confirmed post-op recovery is going well.' },
-    ];
+    const [tasks, setTasks] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchTasks = async () => {
+        try {
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/scheduled');
+            const data = await res.json();
+            if (data.success) {
+                setTasks(data.data);
+            }
+        } catch (err) {
+            console.error('Failed to fetch tasks', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTasks();
+    }, []);
+
+    const handleResolve = async (id) => {
+        try {
+            await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/calls/scheduled/${id}/resolve`, {
+                method: 'PUT'
+            });
+            fetchTasks();
+        } catch (err) {
+            console.error('Failed to resolve task', err);
+        }
+    };
 
     return (
         <div className="bg-[#050505] rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,1)] border border-white/[0.05] w-full h-full flex flex-col relative overflow-hidden group">
@@ -27,41 +53,55 @@ export default function FollowUps() {
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
-                <div className="grid gap-4">
-                    {mockTasks.map(task => (
-                        <div key={task.id} className={`p-5 rounded-2xl border transition-all ${task.status === 'completed' ? 'bg-zinc-900/30 border-white/[0.02] opacity-60' : 'bg-zinc-900/80 border-white/[0.05] hover:border-white/10 hover:bg-zinc-800/80'}`}>
-                            <div className="flex justify-between items-start">
-                                <div className="flex gap-4 items-start">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
-                                        task.status === 'completed' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                                        task.priority === 'high' ? 'bg-red-500/10 border-red-500/20 text-red-500' :
-                                        task.priority === 'medium' ? 'bg-orange-500/10 border-orange-500/20 text-orange-500' :
-                                        'bg-blue-500/10 border-blue-500/20 text-blue-500'
-                                    }`}>
-                                        {task.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                {loading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+                    </div>
+                ) : tasks.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-2">
+                        <CalendarClock className="w-12 h-12 opacity-20" />
+                        <p>No follow-ups scheduled.</p>
+                    </div>
+                ) : (
+                    <div className="grid gap-4">
+                        {tasks.map(task => (
+                            <div key={task.id} className={`p-5 rounded-2xl border transition-all ${task.status === 'Completed' ? 'bg-zinc-900/30 border-white/[0.02] opacity-60' : 'bg-zinc-900/80 border-white/[0.05] hover:border-white/10 hover:bg-zinc-800/80'}`}>
+                                <div className="flex justify-between items-start">
+                                    <div className="flex gap-4 items-start">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                                            task.status === 'Completed' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                                            'bg-blue-500/10 border-blue-500/20 text-blue-500'
+                                        }`}>
+                                            {task.status === 'Completed' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                                        </div>
+                                        
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-1">
+                                                <h4 className={`text-lg font-bold ${task.status === 'Completed' ? 'text-zinc-400 line-through' : 'text-zinc-100'}`}>{task.patient_name || 'Unknown Patient'}</h4>
+                                                <span className="text-[10px] font-mono text-zinc-500 bg-zinc-950 px-2 py-0.5 rounded border border-white/5">{task.phone}</span>
+                                            </div>
+                                            <p className="text-sm text-zinc-400">Assigned to: <span className="font-bold text-zinc-300">{task.agent_name}</span></p>
+                                        </div>
                                     </div>
                                     
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h4 className={`text-lg font-bold ${task.status === 'completed' ? 'text-zinc-400 line-through' : 'text-zinc-100'}`}>{task.patient}</h4>
-                                            <span className="text-[10px] font-mono text-zinc-500 bg-zinc-950 px-2 py-0.5 rounded border border-white/5">{task.number}</span>
-                                        </div>
-                                        <p className="text-sm text-zinc-400">{task.notes}</p>
+                                    <div className="text-right flex flex-col items-end gap-3">
+                                        <span className="text-xs font-bold text-zinc-300 bg-zinc-950 px-3 py-1 rounded-full border border-white/5">
+                                            {new Date(task.scheduled_time).toLocaleString()}
+                                        </span>
+                                        {task.status !== 'Completed' && (
+                                            <button 
+                                                onClick={() => handleResolve(task.id)}
+                                                className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors"
+                                            >
+                                                Resolve <ArrowRight className="w-3 h-3" />
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
-                                
-                                <div className="text-right flex flex-col items-end gap-3">
-                                    <span className="text-xs font-bold text-zinc-300 bg-zinc-950 px-3 py-1 rounded-full border border-white/5">{task.time}</span>
-                                    {task.status !== 'completed' && (
-                                        <button className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-colors">
-                                            Resolve <ArrowRight className="w-3 h-3" />
-                                        </button>
-                                    )}
-                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

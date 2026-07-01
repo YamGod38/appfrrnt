@@ -1,8 +1,14 @@
-import { useState } from 'react';
-import { PhoneCall, Search, Filter, Download, PlayCircle, PhoneIncoming, PhoneOutgoing, PhoneMissed } from 'lucide-react';
+import React, { useState } from 'react';
+import { PhoneCall, Search, Filter, Download, PlayCircle, PauseCircle, PhoneIncoming, PhoneOutgoing, PhoneMissed, ChevronDown, ChevronUp, Bot, User } from 'lucide-react';
+import AudioPlayer from '../../components/dashboard/AudioPlayer';
 
 export default function CallLogs() {
     const [search, setSearch] = useState('');
+    const [selectedAgent, setSelectedAgent] = useState('All');
+    const [selectedDate, setSelectedDate] = useState('');
+    const [expandedLog, setExpandedLog] = useState(null);
+    const [aiSummary, setAiSummary] = useState({});
+    const [playingId, setPlayingId] = useState(null);
     
     // Mock Data for Call Logs
     const logs = [
@@ -14,6 +20,70 @@ export default function CallLogs() {
         { id: 'CALL-9016', type: 'outbound', agent: 'Sarah Jenkins', customer: '+1 (555) 556-7788', duration: '03:10', status: 'Completed', date: 'Oct 23, 04:30 PM', recording: true },
         { id: 'CALL-9015', type: 'missed', agent: 'Unassigned', customer: '+1 (555) 998-8877', duration: '00:00', status: 'Abandoned', date: 'Oct 23, 03:15 PM', recording: false },
     ];
+
+    const agentsList = ['All', ...new Set(logs.map(log => log.agent))];
+
+    const handleExpand = async (logId) => {
+        if (expandedLog === logId) {
+            setExpandedLog(null);
+            return;
+        }
+        setExpandedLog(logId);
+        
+        if (!aiSummary[logId]) {
+            try {
+                const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/ai/summarize/${logId}`);
+                const data = await res.json();
+                if (data.success) {
+                    setAiSummary(prev => ({ ...prev, [logId]: data.data.summary }));
+                }
+            } catch (err) {
+                console.error('Failed to fetch summary');
+                setAiSummary(prev => ({ ...prev, [logId]: 'Failed to generate AI Summary.' }));
+            }
+        }
+    };
+
+    const togglePlay = (logId) => {
+        if (playingId === logId) {
+            setPlayingId(null);
+        } else {
+            setPlayingId(logId);
+        }
+    };
+
+    const handleExport = async () => {
+        try {
+            const queryParams = new URLSearchParams();
+            if (selectedAgent && selectedAgent !== 'All') queryParams.append('agent', selectedAgent);
+            if (selectedDate) queryParams.append('date', selectedDate);
+            
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/calls/export?${queryParams.toString()}`);
+            if (!res.ok) throw new Error('Export failed');
+            
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `call_logs_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to export logs');
+        }
+    };
+
+    const filteredLogs = logs.filter(log => {
+        const matchesSearch = log.id.toLowerCase().includes(search.toLowerCase()) || 
+                              log.agent.toLowerCase().includes(search.toLowerCase()) || 
+                              log.customer.includes(search);
+        const matchesAgent = selectedAgent === 'All' || log.agent === selectedAgent;
+        const matchesDate = selectedDate === '' || log.date.toLowerCase().includes(selectedDate.toLowerCase()) || new Date(log.date).toISOString().slice(0, 10) === selectedDate;
+        return matchesSearch && matchesAgent && matchesDate;
+    });
 
     const getCallIcon = (type) => {
         switch(type) {
@@ -58,10 +128,26 @@ export default function CallLogs() {
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
-                    <button className="flex items-center gap-2 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 rounded-xl border border-white/5 transition-colors text-sm font-bold">
-                        <Filter className="w-4 h-4" /> Filter
-                    </button>
-                    <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all active:scale-95 text-sm font-bold">
+                    <div className="relative">
+                        <select 
+                            className="appearance-none bg-zinc-900/50 hover:bg-zinc-800 text-zinc-300 px-4 py-2.5 pl-10 pr-10 rounded-xl border border-white/5 transition-colors text-sm font-bold focus:outline-none"
+                            value={selectedAgent}
+                            onChange={(e) => setSelectedAgent(e.target.value)}
+                        >
+                            {agentsList.map(agent => (
+                                <option key={agent} value={agent}>{agent}</option>
+                            ))}
+                        </select>
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" />
+                    </div>
+                    <input 
+                        type="date"
+                        className="bg-zinc-900/50 text-zinc-300 rounded-xl px-4 py-2.5 border border-white/5 focus:outline-none focus:border-blue-500/50 text-sm font-bold [color-scheme:dark]"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                    />
+                    <button onClick={handleExport} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl shadow-[0_0_15px_rgba(37,99,235,0.4)] transition-all active:scale-95 text-sm font-bold">
                         <Download className="w-4 h-4" /> Export CSV
                     </button>
                 </div>
@@ -83,8 +169,9 @@ export default function CallLogs() {
                             </tr>
                         </thead>
                         <tbody>
-                            {logs.map(log => (
-                                <tr key={log.id} className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group">
+                            {filteredLogs.map(log => (
+                                <React.Fragment key={log.id}>
+                                <tr className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group">
                                     <td className="px-6 py-4 font-mono text-xs font-bold text-blue-400">{log.id}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2 text-zinc-300 text-sm">
@@ -98,15 +185,73 @@ export default function CallLogs() {
                                     <td className="px-6 py-4 font-mono text-sm text-zinc-300">{log.duration}</td>
                                     <td className="px-6 py-4">{getStatusBadge(log.status)}</td>
                                     <td className="px-6 py-4 text-right">
-                                        {log.recording ? (
-                                            <button className="text-zinc-500 hover:text-emerald-400 transition-colors flex items-center justify-end w-full gap-2 text-xs font-bold uppercase tracking-widest">
-                                                Play <PlayCircle className="w-5 h-5" />
+                                        <div className="flex items-center justify-end gap-3">
+                                            {log.recording ? (
+                                                <button 
+                                                    onClick={() => togglePlay(log.id)}
+                                                    className={`transition-colors flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${playingId === log.id ? 'text-emerald-400' : 'text-zinc-500 hover:text-emerald-400'}`}
+                                                >
+                                                    {playingId === log.id ? (
+                                                        <span className="flex items-center gap-1.5">
+                                                            <div className="flex gap-0.5 items-end h-3">
+                                                                <div className="w-0.5 bg-emerald-400 animate-[bounce_1s_infinite] h-full"></div>
+                                                                <div className="w-0.5 bg-emerald-400 animate-[bounce_1.2s_infinite] h-1/2"></div>
+                                                                <div className="w-0.5 bg-emerald-400 animate-[bounce_0.8s_infinite] h-3/4"></div>
+                                                                <div className="w-0.5 bg-emerald-400 animate-[bounce_1.5s_infinite] h-2/3"></div>
+                                                            </div>
+                                                            Playing <PauseCircle className="w-4 h-4" />
+                                                        </span>
+                                                    ) : (
+                                                        <>Play <PlayCircle className="w-4 h-4" /></>
+                                                    )}
+                                                </button>
+                                            ) : (
+                                                <span className="text-zinc-700 text-[10px] font-bold uppercase tracking-widest">N/A</span>
+                                            )}
+                                            <button 
+                                                onClick={() => handleExpand(log.id)}
+                                                className={`p-1.5 rounded-md transition-colors ${expandedLog === log.id ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-500 hover:text-blue-400 hover:bg-zinc-800'}`}
+                                                title="AI Summary"
+                                            >
+                                                {expandedLog === log.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                             </button>
-                                        ) : (
-                                            <span className="text-zinc-700 text-xs font-bold uppercase tracking-widest">N/A</span>
-                                        )}
+                                        </div>
                                     </td>
                                 </tr>
+                                {expandedLog === log.id && (
+                                    <tr className="bg-blue-500/[0.02] border-b border-white/[0.05]">
+                                        <td colSpan="8" className="px-6 py-6">
+                                            <div className="flex items-start gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                                                    <Bot className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-blue-400 font-bold text-sm mb-2 uppercase tracking-widest flex items-center gap-2">
+                                                        AI Call Summary
+                                                    </h4>
+                                                    {aiSummary[log.id] ? (
+                                                        <p className="text-zinc-300 text-sm leading-relaxed max-w-4xl">
+                                                            {aiSummary[log.id]}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="flex items-center gap-3 text-zinc-500 text-sm">
+                                                            <div className="w-4 h-4 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                                                            Generating summary...
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                                {playingId === log.id && (
+                                    <tr className="bg-emerald-500/[0.02] border-b border-white/[0.05]">
+                                        <td colSpan="8" className="p-4">
+                                            <AudioPlayer log={log} onClose={() => setPlayingId(null)} />
+                                        </td>
+                                    </tr>
+                                )}
+                                </React.Fragment>
                             ))}
                         </tbody>
                     </table>

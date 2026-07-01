@@ -1,5 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, PhoneCall, LogOut, ChevronRight, Activity, Stethoscope } from 'lucide-react';
+import { LayoutDashboard, Users, PhoneCall, LogOut, ChevronRight, Activity, Stethoscope, Target, Power, Forward, Play, UserCheck, MessageSquare, ClipboardList } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 export default function AdminLayout() {
     const role = localStorage.getItem('role');
@@ -8,6 +12,23 @@ export default function AdminLayout() {
     if (role !== 'ADMIN') {
         return <Navigate to="/login" replace />;
     }
+
+    const [routingState, setRoutingState] = useState('live');
+
+    useEffect(() => {
+        socket.on('ROUTING_STATE_SYNC', (state) => {
+            setRoutingState(state);
+        });
+
+        return () => {
+            socket.off('ROUTING_STATE_SYNC');
+        };
+    }, []);
+
+    const updateRoutingState = (newState) => {
+        socket.emit('UPDATE_ROUTING_STATE', newState);
+        setRoutingState(newState);
+    };
 
     return (
         <div className="min-h-screen bg-[#09090b] flex selection:bg-emerald-500/30">
@@ -33,6 +54,16 @@ export default function AdminLayout() {
                         )}
                     </NavLink>
                     
+                    <NavLink to="/admin/reception" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <ClipboardList className={`w-4 h-4 ${isActive ? 'text-purple-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                Reception Metrics
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
+
                     <NavLink to="/admin/agents" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
                         {({ isActive }) => (
                             <>
@@ -62,6 +93,36 @@ export default function AdminLayout() {
                             </>
                         )}
                     </NavLink>
+                    
+                    <NavLink to="/crm/leads" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <Target className={`w-4 h-4 ${isActive ? 'text-purple-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                Leads Pipeline (CRM)
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
+                    
+                    <NavLink to="/admin/attendance" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <UserCheck className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                Attendance Logs
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
+
+                    <NavLink to="/admin/whatsapp" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <MessageSquare className={`w-4 h-4 ${isActive ? 'text-green-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                WhatsApp Center
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
                 </nav>
 
                 {/* User Profile Widget */}
@@ -86,10 +147,37 @@ export default function AdminLayout() {
             </aside>
             
             {/* Main Content */}
-            <main className="flex-1 p-8 overflow-y-auto relative">
+            <main className="flex-1 flex flex-col overflow-y-auto relative">
                 {/* Subtle ambient light */}
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
-                <Outlet />
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none z-0"></div>
+                
+                {/* Global Routing Toggle */}
+                <div className="flex-none p-6 border-b border-white/[0.05] relative z-10 flex justify-end items-center">
+                    <div className="bg-[#050505] border border-white/10 rounded-2xl p-1.5 flex items-center shadow-[0_5px_15px_rgba(0,0,0,0.5)]">
+                        <button 
+                            onClick={() => updateRoutingState('offline')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${routingState === 'offline' ? 'bg-red-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            <Power className="w-3.5 h-3.5" /> Offline
+                        </button>
+                        <button 
+                            onClick={() => updateRoutingState('live')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${routingState === 'live' ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            <Play className="w-3.5 h-3.5" /> Live
+                        </button>
+                        <button 
+                            onClick={() => updateRoutingState('forward')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${routingState === 'forward' ? 'bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            <Forward className="w-3.5 h-3.5" /> Forward
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex-1 p-8 relative z-10">
+                    <Outlet />
+                </div>
             </main>
         </div>
     );
