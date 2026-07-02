@@ -382,7 +382,8 @@ export default function Reception() {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <p className="text-sm font-bold text-zinc-100">{booking.patientName}</p>
-                                                {booking.huid && <span className="text-[10px] font-mono text-zinc-500 bg-black/50 px-1.5 py-0.5 rounded">HUID: {booking.huid}</span>}
+                                                {booking.huid && <span className="text-[10px] font-mono text-zinc-500 bg-black/50 px-1.5 py-0.5 rounded border border-white/5">HUID: {booking.huid}</span>}
+                                                {booking.number && <span className="text-[10px] font-mono text-zinc-500 bg-black/50 px-1.5 py-0.5 rounded border border-white/5 flex items-center gap-1"><PhoneIncoming className="w-3 h-3"/> {booking.number}</span>}
                                             </div>
                                             <p className="text-xs text-zinc-400 mt-1">
                                                 {booking.type === 'APPOINTMENT' && `Dr. ${booking.doctor} • ${booking.date} at ${booking.time}`}

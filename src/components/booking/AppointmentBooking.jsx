@@ -76,6 +76,7 @@ export default function AppointmentBooking({ activeCall }) {
                 socket.emit('BOOKING_MADE', {
                     patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
                     huid: huid,
+                    number: activeCall?.callerNumber || null,
                     doctor: docName,
                     date: selectedDate,
                     time: selectedTime,
@@ -86,6 +87,7 @@ export default function AppointmentBooking({ activeCall }) {
                 socket.emit('SCAN_BOOKING_MADE', {
                     patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
                     huid: huid,
+                    number: activeCall?.callerNumber || null,
                     scanType: scan?.name,
                     date: selectedDate,
                     time: selectedTime,
