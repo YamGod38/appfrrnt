@@ -268,7 +268,7 @@ export default function WhatsappDashboard() {
                                         <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest block mb-2">Recipient Phone</label>
                                         <input 
                                             type="text"
-                                            placeholder="+1 (555) 000-0000"
+                                            placeholder="+91 98765 43210"
                                             value={sendPhone}
                                             onChange={e => setSendPhone(e.target.value)}
                                             className="w-full bg-zinc-950 border border-white/10 rounded-xl p-3 text-white focus:outline-none focus:border-green-500/50 font-mono text-sm"

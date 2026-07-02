@@ -5,11 +5,11 @@ export default function CallHistory() {
     const [expandedLog, setExpandedLog] = useState(null);
     const [aiSummary, setAiSummary] = useState({});
     const mockCalls = [
-        { id: 1, type: 'incoming', number: '+1 (555) 019-2834', status: 'completed', duration: '05:23', time: '10:45 AM', date: 'Today', agent: 'Sarah Jenkins' },
-        { id: 2, type: 'outgoing', number: '+1 (555) 832-1192', status: 'completed', duration: '12:01', time: '09:15 AM', date: 'Today', agent: 'Sarah Jenkins' },
-        { id: 3, type: 'missed', number: '+1 (555) 743-9921', status: 'missed', duration: '00:00', time: '08:30 AM', date: 'Today', agent: 'Sarah Jenkins' },
-        { id: 4, type: 'incoming', number: '+1 (555) 123-4567', status: 'completed', duration: '02:45', time: '04:20 PM', date: 'Yesterday', agent: 'Sarah Jenkins' },
-        { id: 5, type: 'incoming', number: '+1 (555) 987-6543', status: 'completed', duration: '15:10', time: '11:10 AM', date: 'Yesterday', agent: 'Sarah Jenkins' },
+        { id: 1, type: 'incoming', number: '+91 98765 43210', status: 'completed', duration: '05:23', time: '10:45 AM', date: 'Today', agent: 'Priya Desai' },
+        { id: 2, type: 'outgoing', number: '+91 87654 32109', status: 'completed', duration: '12:01', time: '09:15 AM', date: 'Today', agent: 'Priya Desai' },
+        { id: 3, type: 'missed', number: '+91 76543 21098', status: 'missed', duration: '00:00', time: '08:30 AM', date: 'Today', agent: 'Priya Desai' },
+        { id: 4, type: 'incoming', number: '+91 99887 76655', status: 'completed', duration: '02:45', time: '04:20 PM', date: 'Yesterday', agent: 'Priya Desai' },
+        { id: 5, type: 'incoming', number: '+91 88776 65544', status: 'completed', duration: '15:10', time: '11:10 AM', date: 'Yesterday', agent: 'Priya Desai' },
     ];
 
     const getIcon = (type) => {

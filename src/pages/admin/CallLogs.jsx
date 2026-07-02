@@ -12,13 +12,13 @@ export default function CallLogs() {
     
     // Mock Data for Call Logs
     const logs = [
-        { id: 'CALL-9021', type: 'inbound', agent: 'Sarah Jenkins', customer: '+1 (555) 019-2834', duration: '04:12', status: 'Completed', date: 'Oct 24, 10:42 AM', recording: true },
-        { id: 'CALL-9020', type: 'outbound', agent: 'David Chen', customer: '+1 (555) 837-9912', duration: '12:05', status: 'Completed', date: 'Oct 24, 10:15 AM', recording: true },
-        { id: 'CALL-9019', type: 'missed', agent: 'Unassigned', customer: '+1 (555) 234-5678', duration: '00:00', status: 'Missed', date: 'Oct 24, 09:30 AM', recording: false },
-        { id: 'CALL-9018', type: 'inbound', agent: 'Emily Ross', customer: '+1 (555) 987-6543', duration: '01:45', status: 'Completed', date: 'Oct 24, 09:12 AM', recording: true },
-        { id: 'CALL-9017', type: 'inbound', agent: 'Marcus Thorne', customer: '+1 (555) 112-3344', duration: '08:22', status: 'Completed', date: 'Oct 24, 08:55 AM', recording: true },
-        { id: 'CALL-9016', type: 'outbound', agent: 'Sarah Jenkins', customer: '+1 (555) 556-7788', duration: '03:10', status: 'Completed', date: 'Oct 23, 04:30 PM', recording: true },
-        { id: 'CALL-9015', type: 'missed', agent: 'Unassigned', customer: '+1 (555) 998-8877', duration: '00:00', status: 'Abandoned', date: 'Oct 23, 03:15 PM', recording: false },
+        { id: 'CALL-9021', type: 'inbound', agent: 'Priya Desai', customer: '+91 98765 43210', duration: '04:12', status: 'Completed', date: 'Oct 24, 10:42 AM', recording: true },
+        { id: 'CALL-9020', type: 'outbound', agent: 'Arjun Reddy', customer: '+91 87654 32109', duration: '12:05', status: 'Completed', date: 'Oct 24, 10:15 AM', recording: true },
+        { id: 'CALL-9019', type: 'missed', agent: 'Unassigned', customer: '+91 76543 21098', duration: '00:00', status: 'Missed', date: 'Oct 24, 09:30 AM', recording: false },
+        { id: 'CALL-9018', type: 'inbound', agent: 'Sneha Kapoor', customer: '+91 99887 76655', duration: '01:45', status: 'Completed', date: 'Oct 24, 09:12 AM', recording: true },
+        { id: 'CALL-9017', type: 'inbound', agent: 'Ravi Kumar', customer: '+91 88776 65544', duration: '08:22', status: 'Completed', date: 'Oct 24, 08:55 AM', recording: true },
+        { id: 'CALL-9016', type: 'outbound', agent: 'Priya Desai', customer: '+91 77665 54433', duration: '03:10', status: 'Completed', date: 'Oct 23, 04:30 PM', recording: true },
+        { id: 'CALL-9015', type: 'missed', agent: 'Unassigned', customer: '+91 66554 43322', duration: '00:00', status: 'Abandoned', date: 'Oct 23, 03:15 PM', recording: false },
     ];
 
     const agentsList = ['All', ...new Set(logs.map(log => log.agent))];

@@ -177,7 +177,7 @@ export default function AppointmentBooking({ activeCall }) {
                             <div>
                                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Patient Details</p>
                                 <p className="text-lg font-bold text-zinc-100 print:text-black">{activeCall?.customerInfo?.full_name || 'Walk-in Patient'}</p>
-                                <p className="text-sm font-mono text-zinc-400 print:text-gray-600">{activeCall?.callerNumber || '+1 (555) 000-0000'}</p>
+                                <p className="text-sm font-mono text-zinc-400 print:text-gray-600">{activeCall?.callerNumber || '+91 98765 43210'}</p>
                                 <p className="text-[10px] font-bold text-blue-400 font-mono mt-1 uppercase tracking-widest print:text-blue-600">HUID: {activeCall?.customerInfo?.huid || 'NEW-REGISTRATION'}</p>
                             </div>
                             <div>

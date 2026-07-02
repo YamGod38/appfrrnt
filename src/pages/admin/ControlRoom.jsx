@@ -264,7 +264,7 @@ export default function ControlRoom() {
                                         <div className="w-6 h-6 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-[10px] font-bold">A</div>
                                         Agent Alpha
                                     </td>
-                                    <td className="py-4 px-6 group-hover:text-zinc-200 transition-colors font-medium">John Doe</td>
+                                    <td className="py-4 px-6 group-hover:text-zinc-200 transition-colors font-medium">Rahul Sharma</td>
                                     <td className="py-4 px-6 font-mono text-zinc-400 text-xs">03:45</td>
                                     <td className="py-4 px-6">
                                         <span className="inline-flex items-center gap-1.5 text-xs text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded border border-emerald-400/20 font-semibold tracking-wide">

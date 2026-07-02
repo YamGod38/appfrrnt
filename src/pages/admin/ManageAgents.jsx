@@ -6,6 +6,10 @@ export default function ManageAgents() {
     const [activeTab, setActiveTab] = useState('roster'); // roster, analytics, provisioning
     const [editingAgent, setEditingAgent] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    // Call Monitoring State
+    const [activeCallAction, setActiveCallAction] = useState({ type: null, agentId: null });
     
     // Mock Agent Data
     const mockAgents = [
@@ -113,16 +117,18 @@ export default function ManageAgents() {
                                                         <Settings className="w-3 h-3" /> Edit
                                                     </button>
                                                     <button 
+                                                        onClick={() => setActiveCallAction(prev => prev.type === 'WHISPER' && prev.agentId === agent.id ? { type: null, agentId: null } : { type: 'WHISPER', agentId: agent.id })}
                                                         disabled={agent.status !== 'IN_CALL'}
-                                                        className="px-3 py-1.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold tracking-widest uppercase transition-colors flex items-center gap-2"
+                                                        className={`px-3 py-1.5 rounded text-xs font-bold tracking-widest uppercase transition-all flex items-center gap-2 ${activeCallAction.type === 'WHISPER' && activeCallAction.agentId === agent.id ? 'bg-blue-500 text-zinc-950 shadow-[0_0_15px_rgba(59,130,246,0.6)]' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 disabled:opacity-30 disabled:pointer-events-none'}`}
                                                     >
-                                                        <Headphones className="w-3 h-3" /> Whisper
+                                                        <Headphones className="w-3 h-3" /> {activeCallAction.type === 'WHISPER' && activeCallAction.agentId === agent.id ? 'Listening...' : 'Whisper'}
                                                     </button>
                                                     <button 
+                                                        onClick={() => setActiveCallAction(prev => prev.type === 'BARGE' && prev.agentId === agent.id ? { type: null, agentId: null } : { type: 'BARGE', agentId: agent.id })}
                                                         disabled={agent.status !== 'IN_CALL'}
-                                                        className="px-3 py-1.5 rounded bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold tracking-widest uppercase transition-colors flex items-center gap-2"
+                                                        className={`px-3 py-1.5 rounded text-xs font-bold tracking-widest uppercase transition-all flex items-center gap-2 ${activeCallAction.type === 'BARGE' && activeCallAction.agentId === agent.id ? 'bg-red-500 text-zinc-950 shadow-[0_0_15px_rgba(239,68,68,0.6)] animate-pulse' : 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 disabled:opacity-30 disabled:pointer-events-none'}`}
                                                     >
-                                                        <Headset className="w-3 h-3" /> Barge
+                                                        <Headset className="w-3 h-3" /> {activeCallAction.type === 'BARGE' && activeCallAction.agentId === agent.id ? 'Barged In' : 'Barge'}
                                                     </button>
                                                 </div>
                                             </td>
@@ -151,9 +157,9 @@ export default function ManageAgents() {
                                 </thead>
                                 <tbody>
                                     {[
-                                        { id: '849201', patient: 'Michael Chang', number: '+1 (555) 123-0099', doc: 'Dr. Sarah Chen', spec: 'Cardiology', date: 'Tomorrow', time: '10:00 AM', agent: 'Sarah Jenkins', status: 'Confirmed' },
-                                        { id: '849202', patient: 'Emma Watson', number: '+1 (555) 882-3341', doc: 'Dr. Marcus Thorne', spec: 'Neurology', date: 'Jul 15, 2026', time: '02:30 PM', agent: 'David Chen', status: 'Confirmed' },
-                                        { id: '849203', patient: 'David Smith', number: '+1 (555) 991-2233', doc: 'Dr. Emily Ross', spec: 'Orthopedics', date: 'Aug 02, 2026', time: '11:15 AM', agent: 'Sarah Jenkins', status: 'Pending Info' }
+                                        { id: '849201', patient: 'Rahul Sharma', number: '+91 98765 43210', doc: 'Dr. Ramesh Gupta', spec: 'Cardiology', date: 'Tomorrow', time: '10:00 AM', agent: 'Priya Desai', status: 'Confirmed' },
+                                        { id: '849202', patient: 'Anjali Desai', number: '+91 87654 32109', doc: 'Dr. Vivek Singh', spec: 'Neurology', date: 'Jul 15, 2026', time: '02:30 PM', agent: 'Arjun Reddy', status: 'Confirmed' },
+                                        { id: '849203', patient: 'Karthik Iyer', number: '+91 76543 21098', doc: 'Dr. Sneha Kapoor', spec: 'Orthopedics', date: 'Aug 02, 2026', time: '11:15 AM', agent: 'Priya Desai', status: 'Pending Info' }
                                     ].map((booking) => (
                                         <tr key={booking.id} className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group">
                                             <td className="px-6 py-4 font-mono text-xs font-bold text-zinc-400">#{booking.id}</td>

@@ -10,8 +10,9 @@ import Workspace from './pages/agent/Workspace';
 
 import ManageAgents from './pages/admin/ManageAgents';
 import ManageDoctors from './pages/admin/ManageDoctors';
-import CallLogs from './pages/admin/CallLogs';
 import ManageLeads from './pages/admin/ManageLeads';
+import ManagePatients from './pages/admin/ManagePatients';
+import CallLogs from './pages/admin/CallLogs';
 import AttendanceLogs from './pages/admin/AttendanceLogs';
 import WhatsappDashboard from './pages/admin/WhatsappDashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -31,6 +32,7 @@ function App() {
             <Route path="agents" element={<ManageAgents />} />
             <Route path="doctors" element={<ManageDoctors />} />
             <Route path="leads" element={<ManageLeads />} />
+            <Route path="patients" element={<ManagePatients />} />
             <Route path="logs" element={<CallLogs />} />
             <Route path="attendance" element={<AttendanceLogs />} />
             <Route path="whatsapp" element={<WhatsappDashboard />} />
