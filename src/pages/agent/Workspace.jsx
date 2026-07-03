@@ -11,6 +11,9 @@ import CallHistory from '../../components/dashboard/CallHistory';
 import FollowUps from '../../components/dashboard/FollowUps';
 import AgentLeads from '../../components/dashboard/AgentLeads';
 import WhatsappDashboard from '../admin/WhatsappDashboard';
+import BookingLogs from '../admin/BookingLogs';
+import PatientProfileModal from '../../components/dashboard/PatientProfileModal';
+import BillingEstimator from '../../components/dashboard/BillingEstimator';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
@@ -36,6 +39,41 @@ export default function Workspace() {
   // Follow Up Modal State
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [scheduleData, setScheduleData] = useState({ date: '', time: '' });
+
+  // Patient Profile Modal State
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // AI Triage State
+  const [triageNotes, setTriageNotes] = useState('');
+  const [triageResult, setTriageResult] = useState(null);
+
+  useEffect(() => {
+      if (triageNotes.trim().length === 0) {
+          setTriageResult(null);
+          return;
+      }
+      
+      const timer = setTimeout(async () => {
+          try {
+              const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/ai/triage', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                  body: JSON.stringify({ 
+                      symptoms: triageNotes, 
+                      agentName: localStorage.getItem('name') || 'Agent'
+                  })
+              });
+              const data = await res.json();
+              if (data.success) {
+                  setTriageResult(data.data);
+              }
+          } catch (err) {
+              console.error('Triage AI error:', err);
+          }
+      }, 800); // 800ms debounce
+
+      return () => clearTimeout(timer);
+  }, [triageNotes]);
 
   useEffect(() => {
     // Clock in logic
@@ -152,10 +190,30 @@ export default function Workspace() {
   };
 
   const endCall = async () => {
+    // Trigger automated feedback system if we have an active caller
+    if (activeCall?.callerNumber) {
+        try {
+            fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/feedback/send-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({
+                    callId: activeCall.id || Date.now().toString(),
+                    patientNumber: activeCall.callerNumber,
+                    patientName: activeCall.customerInfo?.full_name || '',
+                    agentName: localStorage.getItem('name') || 'Agent'
+                })
+            });
+        } catch (err) {
+            console.error('Failed to trigger feedback', err);
+        }
+    }
+
     setActiveCall(null);
     // When finishing a call, check for missed calls in the queue
     try {
-        const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/next-missed');
+        const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/next-missed', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const data = await res.json();
         if (data.success && data.data) {
             setMissedCallPrompt(data.data);
@@ -170,7 +228,7 @@ export default function Workspace() {
       try {
           const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/schedule', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
               body: JSON.stringify({
                   patient_name: activeCall?.customerInfo?.full_name || 'Unknown Patient',
                   phone: activeCall?.callerNumber || 'Unknown',
@@ -194,6 +252,22 @@ export default function Workspace() {
       socket.emit('UPDATE_AGENT_STATUS', { name: agentName, status: newStatus });
   };
 
+  const simulateIncomingCall = () => {
+      setIncomingCall({
+          id: Date.now().toString(),
+          callerNumber: '+91 98765 43210',
+          customerInfo: {
+              full_name: 'Rahul Kumar',
+              huid: 'APL-8823',
+              vip_status: true,
+              loyalty_tier: 'DIAMOND',
+              phone: '+91 98765 43210',
+              address: 'A-45, Vasant Vihar, New Delhi',
+              last_doctor: 'Dr. Sharma (Cardiology)'
+          }
+      });
+  };
+
   return (
     <div className="flex flex-col h-full relative z-10 w-full max-w-7xl mx-auto print:h-auto print:block print:overflow-visible">
         {/* Workspace Sub-Navigation Tabs */}
@@ -210,9 +284,10 @@ export default function Workspace() {
             >
                 Appointments
             </button>
+            {/* Hidden for now as requested */}
             <button 
                 onClick={() => setActiveTab('hotels')}
-                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'hotels' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+                className={`hidden flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'hotels' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
             >
                 Hotels
             </button>
@@ -227,6 +302,12 @@ export default function Workspace() {
                 className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'calls' ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
             >
                 Calls
+            </button>
+            <button 
+                onClick={() => setActiveTab('bookings')}
+                className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'bookings' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                Bookings
             </button>
             <button 
                 onClick={() => setActiveTab('followups')}
@@ -245,6 +326,13 @@ export default function Workspace() {
                 className={`flex-none px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'whatsapp' ? 'bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'}`}
             >
                 WhatsApp
+            </button>
+            <div className="flex-1"></div>
+            <button 
+                onClick={simulateIncomingCall}
+                className="flex-none px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all animate-pulse"
+            >
+                Test Incoming Call
             </button>
         </div>
 
@@ -281,11 +369,26 @@ export default function Workspace() {
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">LTV</span>
                                             <span className="text-xs font-bold text-zinc-300">$1,240.00</span>
                                         </div>
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Address</span>
+                                            <span className="text-xs font-bold text-zinc-300 truncate max-w-[150px]" title={activeCall.customerInfo?.address || 'N/A'}>{activeCall.customerInfo?.address || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
+                                            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Last Dr.</span>
+                                            <span className="text-xs font-bold text-zinc-300 truncate max-w-[150px]">{activeCall.customerInfo?.last_doctor || 'None'}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-b border-white/[0.05] pb-2">
                                             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Next Appt</span>
                                             <span className="text-xs font-bold text-zinc-300">Oct 24, 2:30 PM</span>
                                         </div>
                                     </div>
+                                    
+                                    <button 
+                                        onClick={() => setShowProfileModal(true)}
+                                        className="mt-6 w-full bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all"
+                                    >
+                                        Open Full Profile & Vault
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-6 text-zinc-500">
@@ -304,6 +407,41 @@ export default function Workspace() {
                     <div className="col-span-4 flex flex-col gap-6 h-full min-h-0 overflow-y-auto custom-scrollbar pr-2 pb-2">
                         <div className="flex-none">
                             <WebRTCDialer />
+                        </div>
+
+                        {/* AI Triage Notes Widget */}
+                        <div className="flex-none bg-[#09090b]/80 border border-white/[0.05] rounded-2xl p-5 shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                                <svg className="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                            </div>
+                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                AI Triage Notes 
+                                {triageResult?.isEmergency && <span className="bg-red-500/20 text-red-400 px-2 py-0.5 rounded text-[9px] animate-pulse">EMERGENCY</span>}
+                            </h3>
+                            <textarea 
+                                value={triageNotes}
+                                onChange={(e) => setTriageNotes(e.target.value)}
+                                placeholder="Type patient symptoms here... (e.g. severe chest pain, fractured arm)"
+                                className="w-full h-24 bg-zinc-950/50 border border-white/5 rounded-xl p-3 text-sm text-zinc-300 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all resize-none placeholder:text-zinc-700"
+                            />
+                            {triageResult && (
+                                <div className="mt-3 flex items-center justify-between bg-zinc-900/80 p-3 rounded-xl border border-white/5">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Suggested Dept</span>
+                                        <span className="text-sm font-semibold text-zinc-200">{triageResult.department}</span>
+                                    </div>
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Priority</span>
+                                        <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded mt-1 ${
+                                            triageResult.priority === 'RED' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+                                            triageResult.priority === 'YELLOW' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 
+                                            'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                        }`}>
+                                            {triageResult.priority}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         
                         {/* Quick Actions Panel */}
@@ -351,10 +489,16 @@ export default function Workspace() {
 
                     {/* RIGHT COLUMN: AI Suggest & Timeline */}
                     <div className="col-span-5 flex flex-col gap-6 h-full min-h-0">
-                        <div className="flex-[0.8] min-h-0">
+                        {/* Dynamic Billing Estimator (Hidden for now as requested) */}
+                        <div className="hidden flex-none">
+                            <BillingEstimator activeCall={activeCall} />
+                        </div>
+
+                        <div className="flex-[0.5] min-h-0">
                             <AiSuggest activeCall={activeCall} />
                         </div>
-                        <div className="flex-[1.2] min-h-0">
+                        
+                        <div className="flex-[0.5] min-h-0">
                             <InteractionTimeline activeCall={activeCall} />
                         </div>
                     </div>
@@ -390,6 +534,13 @@ export default function Workspace() {
             {activeTab === 'calls' && (
                 <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
                     <CallHistory />
+                </div>
+            )}
+
+            {/* BOOKINGS TAB: Booking Logs */}
+            {activeTab === 'bookings' && (
+                <div className="h-[calc(100vh-200px)] animate-in fade-in zoom-in-95 duration-300">
+                    <BookingLogs />
                 </div>
             )}
 
@@ -516,7 +667,12 @@ export default function Workspace() {
                         <button 
                             className="flex-1 bg-zinc-900 hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30 text-zinc-400 border border-white/5 py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all transform hover:-translate-y-1 active:translate-y-0" 
                             onClick={() => {
-                                alert('Call forcibly escalated to Admin Override.');
+                                socket.emit('EMERGENCY_ESCALATION', {
+                                    agentName: localStorage.getItem('name') || 'Agent',
+                                    department: 'Manager / Shift Supervisor',
+                                    symptoms: 'MANUAL OVERRIDE: Priority Escalation to Admin required immediately for patient ' + (incomingCall?.customerInfo?.full_name || 'Unknown'),
+                                    patientProfile: incomingCall?.customerInfo || null
+                                });
                                 setIncomingCall(null);
                             }}
                         >
@@ -548,7 +704,12 @@ export default function Workspace() {
                     {/* Admin / Manager Transfer */}
                     <div 
                         onClick={() => {
-                            alert('Call escalated to Manager!');
+                            socket.emit('EMERGENCY_ESCALATION', {
+                                agentName: localStorage.getItem('name') || 'Agent',
+                                department: 'Manager / Shift Supervisor',
+                                symptoms: 'MANUAL OVERRIDE: Priority Escalation to Admin required immediately for patient ' + (activeCall?.customerInfo?.full_name || 'Unknown'),
+                                patientProfile: activeCall?.customerInfo || null
+                            });
                             setShowTransferModal(false);
                             setActiveCall(null);
                         }}
@@ -645,6 +806,12 @@ export default function Workspace() {
             </div>
             </>
         )}
+
+        <PatientProfileModal 
+            show={showProfileModal} 
+            onClose={() => setShowProfileModal(false)} 
+            customerInfo={activeCall?.customerInfo}
+        />
 
         {/* Real-time Feedback Toast */}
         {feedbackToast && (

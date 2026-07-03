@@ -19,7 +19,12 @@ export default function AttendanceLogs() {
             if (selectedDate) queryParams.append('date', selectedDate);
             if (search) queryParams.append('search', search);
 
-            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/attendance/logs?${queryParams.toString()}`);
+            const token = localStorage.getItem('token');
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/attendance/logs?${queryParams.toString()}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             const data = await res.json();
             if (data.success) {
                 setLogs(data.data);
@@ -37,7 +42,12 @@ export default function AttendanceLogs() {
             if (selectedAgent && selectedAgent !== 'All') queryParams.append('agent', selectedAgent);
             if (selectedDate) queryParams.append('date', selectedDate);
             
-            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/attendance/export?${queryParams.toString()}`);
+            const token = localStorage.getItem('token');
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/attendance/export?${queryParams.toString()}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             if (!res.ok) throw new Error('Export failed');
             
             const blob = await res.blob();

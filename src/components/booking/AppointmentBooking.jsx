@@ -1,19 +1,33 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare } from 'lucide-react';
+import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare, UserCircle, Edit2, Save } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
 export default function AppointmentBooking({ activeCall }) {
-    const [bookingMode, setBookingMode] = useState('consultation'); // 'consultation' or 'scan'
+    const [bookingMode, setBookingMode] = useState('consultation'); // 'consultation', 'scan', 'blood'
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [selectedScan, setSelectedScan] = useState(null);
+    const [addressNotes, setAddressNotes] = useState('');
+    const [labTests, setLabTests] = useState('');
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedTime, setSelectedTime] = useState(null);
     const [status, setStatus] = useState('idle');
     const [doctors, setDoctors] = useState([]);
     const [scanTypes, setScanTypes] = useState([]);
     const [isSendingWA, setIsSendingWA] = useState(false);
+    
+    // Patient Profile States
+    const [patientName, setPatientName] = useState(activeCall?.customerInfo?.full_name || 'Walk-in Patient');
+    const [patientPhone, setPatientPhone] = useState(activeCall?.callerNumber || '');
+    const [patientHuid, setPatientHuid] = useState(activeCall?.customerInfo?.huid || '');
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+    useEffect(() => {
+        setPatientName(activeCall?.customerInfo?.full_name || 'Walk-in Patient');
+        setPatientPhone(activeCall?.callerNumber || '');
+        setPatientHuid(activeCall?.customerInfo?.huid || '');
+    }, [activeCall]);
 
     useEffect(() => {
         socket.emit('GET_INITIAL_STATE');
@@ -62,33 +76,44 @@ export default function AppointmentBooking({ activeCall }) {
 
     const handleBooking = async (e) => {
         e.preventDefault();
-        if ((bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || !selectedDate || !selectedTime) return;
+        if ((bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || (bookingMode === 'blood' && (!addressNotes || !labTests)) || !selectedDate || !selectedTime) return;
         setStatus('booking');
         
         // Simulate network request
         setTimeout(() => {
             setStatus('success');
             const agentName = localStorage.getItem('name') || 'Agent Alpha';
-            const huid = activeCall?.customerInfo?.huid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
+            const huid = patientHuid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
             
             if (bookingMode === 'consultation') {
                 const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
                 socket.emit('BOOKING_MADE', {
-                    patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
+                    patientName: patientName,
                     huid: huid,
-                    number: activeCall?.callerNumber || null,
+                    number: patientPhone,
                     doctor: docName,
                     date: selectedDate,
                     time: selectedTime,
                     agentName: agentName
                 });
-            } else {
+            } else if (bookingMode === 'scan') {
                 const scan = scanTypes.find(s => s.id === selectedScan);
                 socket.emit('SCAN_BOOKING_MADE', {
-                    patientName: activeCall?.customerInfo?.full_name || 'Walk-in Patient',
+                    patientName: patientName,
                     huid: huid,
-                    number: activeCall?.callerNumber || null,
+                    number: patientPhone,
                     scanType: scan?.name,
+                    date: selectedDate,
+                    time: selectedTime,
+                    agentName: agentName
+                });
+            } else if (bookingMode === 'blood') {
+                socket.emit('BLOOD_COLLECTION_MADE', {
+                    patientName: patientName,
+                    huid: huid,
+                    number: patientPhone,
+                    notes: `Tests: ${labTests}`,
+                    address: addressNotes,
                     date: selectedDate,
                     time: selectedTime,
                     agentName: agentName
@@ -98,19 +123,18 @@ export default function AppointmentBooking({ activeCall }) {
     };
 
     const handleWhatsAppSend = async () => {
-        if (!activeCall?.callerNumber) {
+        if (!patientPhone) {
             return alert("No phone number linked to this call.");
         }
         setIsSendingWA(true);
         try {
-            const patientName = activeCall?.customerInfo?.full_name || 'Walk-in Patient';
-            const desc = bookingMode === 'consultation' ? 'Appointment Booking' : 'Diagnostic Scan Booking';
+            const desc = bookingMode === 'consultation' ? 'Appointment Booking' : bookingMode === 'scan' ? 'Diagnostic Scan Booking' : 'Blood Collection Booking';
             const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/whatsapp/send-pdf', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     type: 'DOCTOR',
-                    phone: activeCall.callerNumber,
+                    phone: patientPhone,
                     data: { name: patientName, amount: '0.00', description: desc }
                 })
             });
@@ -178,9 +202,9 @@ export default function AppointmentBooking({ activeCall }) {
                         <div className="grid grid-cols-2 gap-8 mb-8">
                             <div>
                                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Patient Details</p>
-                                <p className="text-lg font-bold text-zinc-100 print:text-black">{activeCall?.customerInfo?.full_name || 'Walk-in Patient'}</p>
-                                <p className="text-sm font-mono text-zinc-400 print:text-gray-600">{activeCall?.callerNumber || '+91 98765 43210'}</p>
-                                <p className="text-[10px] font-bold text-blue-400 font-mono mt-1 uppercase tracking-widest print:text-blue-600">HUID: {activeCall?.customerInfo?.huid || 'NEW-REGISTRATION'}</p>
+                                <p className="text-lg font-bold text-zinc-100 print:text-black">{patientName}</p>
+                                <p className="text-sm font-mono text-zinc-400 print:text-gray-600">{patientPhone || '+91 98765 43210'}</p>
+                                <p className="text-[10px] font-bold text-blue-400 font-mono mt-1 uppercase tracking-widest print:text-blue-600">HUID: {patientHuid || 'NEW-REGISTRATION'}</p>
                             </div>
                             <div>
                                 {bookingMode === 'consultation' ? (
@@ -189,11 +213,18 @@ export default function AppointmentBooking({ activeCall }) {
                                         <p className="text-lg font-bold text-emerald-400 print:text-black">{doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned'}</p>
                                         <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest print:text-gray-600">{doctors.find(d => d.id === selectedDoctor)?.spec || 'Specialist'}</p>
                                     </>
-                                ) : (
+                                ) : bookingMode === 'scan' ? (
                                     <>
                                         <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Scan Details</p>
                                         <p className="text-lg font-bold text-cyan-400 print:text-black">{scanTypes.find(s => s.id === selectedScan)?.name}</p>
                                         <p className="text-xs font-bold text-amber-400 uppercase mt-1 print:text-orange-600">Prep: {scanTypes.find(s => s.id === selectedScan)?.prep}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 print:text-gray-500">Blood Collection Details</p>
+                                        <p className="text-lg font-bold text-rose-400 print:text-black">Home Visit</p>
+                                        <p className="text-xs font-bold text-zinc-400 mt-1 print:text-gray-600">Tests: {labTests}</p>
+                                        <p className="text-xs font-bold text-zinc-400 mt-1 print:text-gray-600">Addr: {addressNotes}</p>
                                     </>
                                 )}
                             </div>
@@ -212,8 +243,64 @@ export default function AppointmentBooking({ activeCall }) {
                     </div>
                 ) : (
                     <>
+                    {/* PATIENT PROFILE SECTION */}
+                    <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 relative overflow-hidden group mb-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-3xl rounded-full pointer-events-none"></div>
+                        <div className="flex justify-between items-center mb-4">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <UserCircle className="w-4 h-4 text-blue-400" /> Patient Profile
+                            </label>
+                            {isEditingProfile ? (
+                                <button 
+                                    onClick={() => {
+                                        setIsEditingProfile(false);
+                                        socket.emit('UPDATE_PATIENT_PROFILE', { patientName, phoneNumber: patientPhone, huid: patientHuid });
+                                    }}
+                                    className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                                >
+                                    <Save className="w-3 h-3" /> SAVE
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={() => setIsEditingProfile(true)}
+                                    className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400 hover:text-white transition-colors"
+                                >
+                                    <Edit2 className="w-3 h-3" /> EDIT
+                                </button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 relative z-10">
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 mb-1 block">Full Name</label>
+                                {isEditingProfile ? (
+                                    <input 
+                                        type="text" 
+                                        value={patientName} 
+                                        onChange={(e) => setPatientName(e.target.value)} 
+                                        className="w-full bg-zinc-950 text-white rounded-lg px-3 py-2 border border-blue-500/30 focus:outline-none focus:border-blue-500 text-sm"
+                                    />
+                                ) : (
+                                    <p className="text-sm font-bold text-zinc-100">{patientName}</p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-zinc-500 mb-1 block">Phone Number</label>
+                                {isEditingProfile ? (
+                                    <input 
+                                        type="text" 
+                                        value={patientPhone} 
+                                        onChange={(e) => setPatientPhone(e.target.value)} 
+                                        className="w-full bg-zinc-950 text-white rounded-lg px-3 py-2 border border-blue-500/30 focus:outline-none focus:border-blue-500 text-sm"
+                                    />
+                                ) : (
+                                    <p className="text-sm font-mono text-zinc-300">{patientPhone || 'N/A'}</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* BOOKING MODE TOGGLE */}
-                    <div className="flex bg-zinc-900/50 p-1.5 rounded-xl border border-white/5 mb-8 w-full max-w-md mx-auto">
+                    <div className="flex flex-wrap gap-2 bg-zinc-900/50 p-1.5 rounded-xl border border-white/5 mb-8 w-full max-w-lg mx-auto">
                         <button 
                             type="button"
                             onClick={() => { setBookingMode('consultation'); setSelectedScan(null); }}
@@ -227,6 +314,13 @@ export default function AppointmentBooking({ activeCall }) {
                             className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${bookingMode === 'scan' ? 'bg-cyan-500 text-zinc-950 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'text-zinc-500 hover:text-zinc-300'}`}
                         >
                             Diagnostic Scan
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={() => { setBookingMode('blood'); setSelectedDoctor(null); setSelectedScan(null); }}
+                            className={`flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${bookingMode === 'blood' ? 'bg-rose-500 text-zinc-950 shadow-[0_0_15px_rgba(244,63,94,0.3)]' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        >
+                            Blood Collect
                         </button>
                     </div>
 
@@ -265,7 +359,7 @@ export default function AppointmentBooking({ activeCall }) {
                             )})}
                         </div>
                     </div>
-                    ) : (
+                    ) : bookingMode === 'scan' ? (
                     <div>
                         <div className="flex items-center justify-between mb-4">
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">1. Select Scan Type</label>
@@ -299,6 +393,39 @@ export default function AppointmentBooking({ activeCall }) {
                             )}
                         </div>
                     </div>
+                    ) : (
+                    <div>
+                        <div className="flex items-center justify-between mb-4">
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">1. Home Collection Details</label>
+                        </div>
+                        <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 relative overflow-hidden group space-y-4">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-3xl rounded-full pointer-events-none"></div>
+                            
+                            <div className="relative z-10">
+                                <label className="text-xs font-bold text-zinc-300 mb-2 block">Lab Tests Required</label>
+                                <input
+                                    type="text"
+                                    value={labTests}
+                                    onChange={(e) => setLabTests(e.target.value)}
+                                    placeholder="e.g. CBC, Lipid Profile, Thyroid, HbA1c..."
+                                    className="w-full bg-zinc-950 text-zinc-100 rounded-xl p-4 border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.8)] focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all text-sm"
+                                />
+                            </div>
+
+                            <div className="relative z-10">
+                                <label className="text-xs font-bold text-zinc-300 mb-2 block">Home Address</label>
+                                <textarea
+                                    value={addressNotes}
+                                    onChange={(e) => setAddressNotes(e.target.value)}
+                                    placeholder="Enter complete address, landmarks, and instructions for the phlebotomist..."
+                                    className="w-full bg-zinc-950 text-zinc-100 rounded-xl p-4 border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.8)] focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all text-sm h-24 resize-none custom-scrollbar"
+                                />
+                                <p className="text-[10px] text-zinc-500 mt-2 font-bold flex items-center gap-1">
+                                    <Activity className="w-3 h-3 text-rose-500" /> Note: Fasting may be required depending on tests prescribed.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                     )}
 
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.05] to-transparent"></div>
@@ -306,7 +433,7 @@ export default function AppointmentBooking({ activeCall }) {
                     {/* DATE & TIME SELECTION */}
                     <div className="grid grid-cols-2 gap-8 mt-8">
                         {/* DATE */}
-                        <div className={`transition-opacity duration-300 ${(!selectedDoctor && !selectedScan) ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                        <div className={`transition-opacity duration-300 ${(!selectedDoctor && !selectedScan && bookingMode !== 'blood') ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                             <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">2. Choose Date</label>
                             <div className="relative group/input">
                                 <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
@@ -372,6 +499,8 @@ export default function AppointmentBooking({ activeCall }) {
                                 setStatus('idle');
                                 setSelectedDoctor(null);
                                 setSelectedScan(null);
+                                setAddressNotes('');
+                                setLabTests('');
                                 setSelectedDate('');
                                 setSelectedTime(null);
                             }}
@@ -383,8 +512,8 @@ export default function AppointmentBooking({ activeCall }) {
                 ) : (
                     <button 
                         onClick={handleBooking}
-                        disabled={(bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || !selectedDate || !selectedTime || status === 'booking'}
-                        className={`relative w-full text-white font-black py-5 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none group/btn shadow-[0_8px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-2 ${status === 'booking' ? (bookingMode === 'scan' ? 'bg-cyan-500/50' : 'bg-emerald-500/50') : 'bg-zinc-100 text-zinc-950 hover:bg-white'}`}
+                        disabled={(bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || (bookingMode === 'blood' && (!addressNotes || !labTests)) || !selectedDate || !selectedTime || status === 'booking'}
+                        className={`relative w-full text-white font-black py-5 rounded-2xl transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none group/btn shadow-[0_8px_0_rgba(9,9,11,1)] active:shadow-none active:translate-y-2 ${status === 'booking' ? (bookingMode === 'scan' ? 'bg-cyan-500/50' : bookingMode === 'blood' ? 'bg-rose-500/50' : 'bg-emerald-500/50') : 'bg-zinc-100 text-zinc-950 hover:bg-white'}`}
                     >
                         <span className="relative z-10 tracking-[0.2em] uppercase text-sm flex items-center justify-center gap-2">
                             {status === 'booking' ? (

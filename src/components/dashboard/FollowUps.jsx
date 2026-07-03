@@ -7,7 +7,9 @@ export default function FollowUps() {
 
     const fetchTasks = async () => {
         try {
-            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/scheduled');
+            const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/calls/scheduled', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
             const data = await res.json();
             if (data.success) {
                 setTasks(data.data);
@@ -26,7 +28,8 @@ export default function FollowUps() {
     const handleResolve = async (id) => {
         try {
             await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + `/api/calls/scheduled/${id}/resolve`, {
-                method: 'PUT'
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
             fetchTasks();
         } catch (err) {

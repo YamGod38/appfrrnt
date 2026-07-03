@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Target, Activity, Users, CalendarCheck, PhoneIncoming, TrendingUp, Search, Download, X, Stethoscope, Bell, CloudRain, CloudSnow, CloudLightning, Cloud, Sun, CloudFog, MapPin, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { io } from 'socket.io-client';
+import BedManagement from '../../components/admin/BedManagement';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 
@@ -17,6 +18,7 @@ export default function Reception() {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportTimeframe, setExportTimeframe] = useState('today');
     const [exportStatus, setExportStatus] = useState('all');
+    const [exportType, setExportType] = useState('all');
     
     const handleExport = (e) => {
         e.preventDefault();
@@ -29,27 +31,33 @@ export default function Reception() {
             filtered = filtered.filter(b => b.status !== 'Verified');
         }
 
-        // Sort by status to show them separatedly as requested
-        filtered.sort((a, b) => {
-            if (a.status === b.status) return 0;
-            return a.status === 'Verified' ? 1 : -1;
-        });
+        // Filter by Type
+        if (exportType !== 'all') {
+            filtered = filtered.filter(b => b.type === exportType);
+        }
+
+        // Sort by ID ascending (first come first serve)
+        filtered.sort((a, b) => a.id - b.id);
 
         const csvRows = [];
-        csvRows.push(['ID', 'Type', 'Patient HUID', 'Patient Name', 'Details', 'Date', 'Time', 'Status'].join(','));
+        csvRows.push(['S.No.', 'ID', 'Type', 'Patient HUID', 'Patient Name', 'Phone Number', 'Details', 'Address (Blood)', 'Date', 'Time', 'Status'].join(','));
         
-        filtered.forEach(b => {
+        filtered.forEach((b, index) => {
             let details = '';
             if (b.type === 'APPOINTMENT') details = `Dr. ${b.doctor}`;
             if (b.type === 'SCAN') details = b.scanType;
             if (b.type === 'HOTEL') details = `${b.hotel} - ${b.roomType}`;
+            if (b.type === 'BLOOD_COLLECTION') details = b.bloodTests || 'Home Blood Collection';
             
             const row = [
+                index + 1,
                 b.id,
                 b.type,
                 b.huid || 'N/A',
                 b.patientName ? `"${b.patientName}"` : 'N/A',
+                b.number || 'N/A',
                 `"${details}"`,
+                b.address ? `"${b.address}"` : 'N/A',
                 b.date || 'N/A',
                 b.time || 'N/A',
                 b.status || 'Live'
@@ -61,13 +69,14 @@ export default function Reception() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `Reception_Bookings_${exportTimeframe}_${new Date().toISOString().slice(0,10)}.csv`;
+        a.download = `Reception_Bookings_${exportType}_${exportTimeframe}_${new Date().toISOString().slice(0,10)}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
         
         setShowExportModal(false);
         setExportTimeframe('today');
         setExportStatus('all');
+        setExportType('all');
     };
 
     useEffect(() => {
@@ -112,13 +121,44 @@ export default function Reception() {
             }
         };
 
+        const fetchBookings = async () => {
+            try {
+                const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/bookings');
+                const data = await res.json();
+                if (data.success) {
+                    const mappedBookings = data.bookings.map(b => ({
+                        id: b.id,
+                        type: b.type,
+                        patientName: b.patient_name,
+                        huid: b.huid,
+                        number: b.phone_number,
+                        doctor: b.type === 'APPOINTMENT' ? b.details.replace('Dr. ', '') : undefined,
+                        scanType: b.type === 'SCAN' ? b.details : undefined,
+                        hotel: b.type === 'HOTEL' ? b.details.split(' - ')[0] : undefined,
+                        roomType: b.type === 'HOTEL' ? b.details.split(' - ')[1] : undefined,
+                        bloodTests: b.type === 'BLOOD_COLLECTION' ? b.details : undefined,
+                        date: new Date(b.booking_date).toLocaleDateString('en-CA'), // YYYY-MM-DD
+                        time: b.booking_time,
+                        status: b.status,
+                        address: b.address
+                    }));
+                    setAllBookings(mappedBookings);
+                }
+            } catch (err) {
+                console.error('Failed to fetch bookings', err);
+            }
+        };
+
         fetchStats();
         fetchWeather();
+        fetchBookings();
         const weatherInterval = setInterval(fetchWeather, 30 * 60 * 1000); // Update every 30 mins
 
         // Listen for real-time events that affect conversion rates
         socket.on('BOOKING_SYNC', fetchStats);
-        socket.on('ALL_BOOKINGS_SYNC', setAllBookings);
+        socket.on('ALL_BOOKINGS_SYNC', (bookings) => {
+            fetchBookings(); // Refetch from DB to get reliable data instead of in-memory sync
+        });
         socket.on('INCOMING_CALL_RINGING', fetchStats);
         socket.on('DOCTOR_STATUS_SYNC', setDoctors);
         socket.on('ADMIN_MEMO_SYNC', setAdminMemo);
@@ -127,7 +167,7 @@ export default function Reception() {
 
         return () => {
             socket.off('BOOKING_SYNC', fetchStats);
-            socket.off('ALL_BOOKINGS_SYNC', setAllBookings);
+            socket.off('ALL_BOOKINGS_SYNC');
             socket.off('INCOMING_CALL_RINGING', fetchStats);
             socket.off('DOCTOR_STATUS_SYNC', setDoctors);
             socket.off('ADMIN_MEMO_SYNC', setAdminMemo);
@@ -314,8 +354,13 @@ export default function Reception() {
                 </div>
             </div>
 
-            {/* Unified Booking Feed */}
-            <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden mb-8">
+            {/* Premium Smart Bed Map Section */}
+            <div className="h-[700px] mb-6">
+                <BedManagement socket={socket} />
+            </div>
+
+            {/* Bottom Section: Unified Feed */}
+            <div className="flex-1 bg-[#09090b]/80 p-6 rounded-2xl border border-white/[0.05] shadow-[0_10px_30px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col min-h-0 relative">
                 <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-zinc-950/50">
                     <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
                         <CalendarCheck className="w-5 h-5 text-emerald-500" />
@@ -373,10 +418,12 @@ export default function Reception() {
                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                             booking.type === 'APPOINTMENT' ? 'bg-blue-500/10 text-blue-400' :
                                             booking.type === 'SCAN' ? 'bg-cyan-500/10 text-cyan-400' :
+                                            booking.type === 'BLOOD_COLLECTION' ? 'bg-rose-500/10 text-rose-400' :
                                             'bg-amber-500/10 text-amber-400'
                                         }`}>
                                             {booking.type === 'APPOINTMENT' ? <Users className="w-5 h-5" /> :
                                              booking.type === 'SCAN' ? <Activity className="w-5 h-5" /> :
+                                             booking.type === 'BLOOD_COLLECTION' ? <Target className="w-5 h-5" /> :
                                              <CalendarCheck className="w-5 h-5" />}
                                         </div>
                                         <div>
@@ -389,6 +436,7 @@ export default function Reception() {
                                                 {booking.type === 'APPOINTMENT' && `Dr. ${booking.doctor} • ${booking.date} at ${booking.time}`}
                                                 {booking.type === 'SCAN' && `${booking.scanType} • ${booking.date} at ${booking.time}`}
                                                 {booking.type === 'HOTEL' && `${booking.hotel} (${booking.roomType}) • ${booking.checkIn}`}
+                                                {booking.type === 'BLOOD_COLLECTION' && `${booking.bloodTests || 'Home Blood Collection'} • ${booking.date} at ${booking.time}`}
                                             </p>
                                         </div>
                                     </div>
@@ -480,6 +528,36 @@ export default function Reception() {
                                 </div>
                             </div>
                         )}
+
+                        <div>
+                            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Booking Type</label>
+                            <div className="flex flex-col gap-2">
+                                {[
+                                    { id: 'all', label: 'All Booking Types' },
+                                    { id: 'APPOINTMENT', label: 'Doctor Appointments' },
+                                    { id: 'SCAN', label: 'Diagnostic Scans' },
+                                    { id: 'BLOOD_COLLECTION', label: 'Home Blood Collection' }
+                                ].map((s) => (
+                                    <button 
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => setExportType(s.id)}
+                                        className={`w-full text-left px-5 py-3 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-3 ${
+                                            exportType === s.id 
+                                            ? 'bg-purple-500/10 text-purple-400 border border-purple-500/30 shadow-[inset_0_0_15px_rgba(168,85,247,0.1)]' 
+                                            : 'bg-zinc-900/50 text-zinc-400 border border-white/5 hover:bg-zinc-800 hover:text-zinc-300'
+                                        }`}
+                                    >
+                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                            exportType === s.id ? 'border-purple-400' : 'border-zinc-600'
+                                        }`}>
+                                            {exportType === s.id && <div className="w-2 h-2 rounded-full bg-purple-400"></div>}
+                                        </div>
+                                        {s.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
                         <div>
                             <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Booking Status</label>

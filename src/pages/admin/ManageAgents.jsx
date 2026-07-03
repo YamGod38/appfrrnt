@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShieldCheck, Activity, Users, Headset, Clock, Star, Plus, Shield, Headphones, Calendar, CheckCircle2, Settings, X } from 'lucide-react';
+import { io } from 'socket.io-client';
+
+const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
 import LiveAnalytics from '../../components/admin/LiveAnalytics';
 
 export default function ManageAgents() {
@@ -11,13 +14,33 @@ export default function ManageAgents() {
     // Call Monitoring State
     const [activeCallAction, setActiveCallAction] = useState({ type: null, agentId: null });
     
-    // Mock Agent Data
-    const mockAgents = [
-        { id: 1, name: 'Sarah Jenkins', email: 'sarah.j@apollo.com', status: 'IN_CALL', duration: '04:12', skills: ['Clinic', 'Booking'], csat: 4.8 },
-        { id: 2, name: 'David Chen', email: 'david.c@apollo.com', status: 'ONLINE', duration: '00:00', skills: ['Hotel', 'Support'], csat: 4.9 },
-        { id: 3, name: 'Emily Ross', email: 'emily.r@apollo.com', status: 'WRAP_UP', duration: '01:30', skills: ['Clinic', 'Support'], csat: 4.5 },
-        { id: 4, name: 'Marcus Thorne', email: 'marcus.t@apollo.com', status: 'OFFLINE', duration: '00:00', skills: ['Hotel', 'Booking'], csat: 4.2 }
-    ];
+    // Agent Data State
+    const [agents, setAgents] = useState([
+        { id: 1, name: 'Agent Alpha', email: 'alpha@apollo.com', status: 'IN_CALL', duration: '04:12', skills: ['Clinic', 'Booking'], csat: 4.8, ratingsCount: 10 },
+        { id: 2, name: 'Agent Beta', email: 'beta@apollo.com', status: 'ONLINE', duration: '00:00', skills: ['Hotel', 'Support'], csat: 4.9, ratingsCount: 20 },
+        { id: 3, name: 'Agent Gamma', email: 'gamma@apollo.com', status: 'WRAP_UP', duration: '01:30', skills: ['Clinic', 'Support'], csat: 4.5, ratingsCount: 5 },
+        { id: 4, name: 'Agent Delta', email: 'delta@apollo.com', status: 'OFFLINE', duration: '00:00', skills: ['Hotel', 'Booking'], csat: 4.2, ratingsCount: 8 },
+        { id: 5, name: 'Sarah Jenkins', email: 'sarah.j@apollo.com', status: 'IN_CALL', duration: '04:12', skills: ['Clinic', 'Booking'], csat: 4.8, ratingsCount: 12 },
+        { id: 6, name: 'David Chen', email: 'david.c@apollo.com', status: 'ONLINE', duration: '00:00', skills: ['Hotel', 'Support'], csat: 4.9, ratingsCount: 30 },
+    ]);
+
+    useEffect(() => {
+        const handleFeedback = (feedback) => {
+            setAgents(prev => prev.map(agent => {
+                if (agent.name === feedback.agentName) {
+                    const newCount = agent.ratingsCount + 1;
+                    const newCsat = ((agent.csat * agent.ratingsCount) + feedback.rating) / newCount;
+                    return { ...agent, csat: parseFloat(newCsat.toFixed(1)), ratingsCount: newCount };
+                }
+                return agent;
+            }));
+        };
+
+        socket.on('FEEDBACK_RECEIVED', handleFeedback);
+        return () => {
+            socket.off('FEEDBACK_RECEIVED', handleFeedback);
+        };
+    }, []);
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -80,7 +103,7 @@ export default function ManageAgents() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {mockAgents.map(agent => (
+                                    {agents.map(agent => (
                                         <tr key={agent.id} className="border-b border-white/[0.02] hover:bg-zinc-800/20 transition-colors group">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -103,9 +126,12 @@ export default function ManageAgents() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center gap-1">
-                                                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                                                    <span className="text-sm font-bold text-zinc-200">{agent.csat}</span>
+                                                <div className="flex flex-col items-center justify-center gap-0.5">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 animate-in zoom-in duration-300" key={agent.csat} />
+                                                        <span className="text-sm font-bold text-zinc-200 animate-in slide-in-from-bottom-1 duration-300" key={`val-${agent.csat}`}>{agent.csat}</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-zinc-500 font-medium uppercase tracking-widest">{agent.ratingsCount} reviews</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">

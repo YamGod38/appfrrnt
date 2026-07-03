@@ -4,6 +4,7 @@ import { io } from 'socket.io-client';
 import { Phone, CalendarCheck, Clock, ShieldCheck, UserCheck, Activity, ChevronRight, Bell, Send } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import AgentStatusWidget from '../../components/agents/AgentStatusWidget';
+import BedManagement from '../../components/admin/BedManagement';
 
 const mockChartData = [
   { time: '08:00', inbound: 12, outbound: 5 },
@@ -44,6 +45,7 @@ export default function ControlRoom() {
     };
 
     return (
+        <>
         <div className="flex flex-col gap-8 h-full max-w-7xl mx-auto w-full relative z-10 animate-in fade-in duration-500">
             <header className="flex justify-between items-end pb-6 border-b border-white/[0.05]">
                 <div>
@@ -161,17 +163,25 @@ export default function ControlRoom() {
                 </div>
             </div>
 
+            {/* Premium Smart Bed Map Section */}
+            <div className="h-[600px] mt-6">
+                <BedManagement socket={socket} />
+            </div>
+
             {/* Bottom Split View */}
-            <div className="flex-1 grid grid-cols-2 gap-6 mt-2 min-h-0">
+            <div className="flex-1 grid grid-cols-2 gap-6 mt-6 min-h-0">
                 
                 {/* Live Bookings Feed */}
                 <div className="bg-[#09090b]/90 rounded-2xl border border-white/[0.05] shadow-[0_20px_50px_-15px_rgba(0,0,0,1)] backdrop-blur-xl flex flex-col overflow-hidden">
                     <div className="px-6 py-5 border-b border-white/[0.05] flex justify-between items-center bg-zinc-950/50">
-                        <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-blue-500" />
-                            Live Bookings Feed
-                        </h3>
-                        {recentBookings.length > 0 && <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 animate-pulse">Live</span>}
+                        <div className="flex items-center gap-4">
+                            <h3 className="text-lg font-bold text-zinc-100 tracking-tight flex items-center gap-2">
+                                <Activity className="w-5 h-5 text-blue-500" />
+                                Live Bookings Feed
+                            </h3>
+                            {recentBookings.length > 0 && <span className="text-[10px] font-bold uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-1 rounded border border-blue-500/20 animate-pulse">Live</span>}
+                        </div>
+                        <button onClick={() => navigate('/admin/bookings')} className="text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1">View Logs <ChevronRight className="w-3 h-3" /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-3">
                         {recentBookings.length === 0 ? (
@@ -302,8 +312,8 @@ export default function ControlRoom() {
                         </table>
                     </div>
                 </div>
-
             </div>
-        </div>
+            </div>
+        </>
     );
 }

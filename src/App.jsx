@@ -7,6 +7,7 @@ import Login from './pages/auth/Login';
 import ControlRoom from './pages/admin/ControlRoom';
 import Reception from './pages/admin/Reception';
 import Workspace from './pages/agent/Workspace';
+import Feedback from './pages/Feedback';
 
 import ManageAgents from './pages/admin/ManageAgents';
 import ManageDoctors from './pages/admin/ManageDoctors';
@@ -15,6 +16,8 @@ import ManagePatients from './pages/admin/ManagePatients';
 import CallLogs from './pages/admin/CallLogs';
 import AttendanceLogs from './pages/admin/AttendanceLogs';
 import WhatsappDashboard from './pages/admin/WhatsappDashboard';
+import BookingLogs from './pages/admin/BookingLogs';
+import AdminKnowledge from './pages/admin/AdminKnowledge';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -23,6 +26,9 @@ function App() {
       <Routes>
         {/* Auth Route */}
         <Route path="/login" element={<Login />} />
+        
+        {/* Public Routes */}
+        <Route path="/feedback/:id" element={<Feedback />} />
         
         {/* Admin Routes */}
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
@@ -34,8 +40,10 @@ function App() {
             <Route path="leads" element={<ManageLeads />} />
             <Route path="patients" element={<ManagePatients />} />
             <Route path="logs" element={<CallLogs />} />
+            <Route path="bookings" element={<BookingLogs />} />
             <Route path="attendance" element={<AttendanceLogs />} />
             <Route path="whatsapp" element={<WhatsappDashboard />} />
+            <Route path="knowledge" element={<AdminKnowledge />} />
           </Route>
         </Route>
 
