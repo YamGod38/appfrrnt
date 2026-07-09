@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
-import { Activity, LogOut, Phone } from 'lucide-react';
+import { Outlet, Navigate, NavLink } from 'react-router-dom';
+import { Activity, LogOut, Phone, FileText } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
@@ -31,14 +31,30 @@ export default function AgentLayout() {
                 {/* Neon light edge */}
                 <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent opacity-50"></div>
 
-                <div className="flex items-center gap-3">
+                <NavLink to="/agent" end className="flex items-center gap-3 hover:opacity-80 transition-opacity">
                     <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-white/10 flex items-center justify-center shadow-inner">
                         <Activity className="w-4 h-4 text-zinc-300" />
                     </div>
                     <h1 className="text-lg font-bold tracking-tight text-zinc-100">Apollo <span className="text-zinc-500 font-medium">| Agent Workspace</span></h1>
-                </div>
+                </NavLink>
 
                 <div className="flex items-center gap-6">
+                    <NavLink 
+                        to="/agent" 
+                        end
+                        className={({ isActive }) => `flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors ${isActive ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    >
+                        <Phone className="w-3.5 h-3.5" />
+                        Workspace
+                    </NavLink>
+                    <NavLink 
+                        to="/agent/services" 
+                        className={({ isActive }) => `flex items-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors ${isActive ? 'text-emerald-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+                    >
+                        <FileText className="w-3.5 h-3.5" />
+                        Services & Pricing
+                    </NavLink>
+                    <div className="w-px h-6 bg-white/10"></div>
                     <div className="relative">
                         <button 
                             onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}

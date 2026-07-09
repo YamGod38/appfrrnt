@@ -126,11 +126,12 @@ export default function AdminLayout() {
                         )}
                     </NavLink>
                     
-                    <NavLink to="/crm/leads" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                    <p className="text-[10px] uppercase tracking-widest font-semibold text-zinc-600 mt-4 mb-2 px-2">CRM Module</p>
+                    <NavLink to="/admin/leads" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
                         {({ isActive }) => (
                             <>
                                 <Target className={`w-4 h-4 ${isActive ? 'text-purple-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
-                                Leads Pipeline (CRM)
+                                Leads Pipeline
                                 <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
                             </>
                         )}
@@ -141,6 +142,16 @@ export default function AdminLayout() {
                             <>
                                 <UserCheck className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
                                 Attendance Logs
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
+
+                    <NavLink to="/admin/services" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <Activity className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                Services & Pricing
                                 <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
                             </>
                         )}

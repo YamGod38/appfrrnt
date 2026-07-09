@@ -26,9 +26,14 @@ export default function Workspace() {
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showAmbulanceModal, setShowAmbulanceModal] = useState(false);
+  const [ambulanceLocation, setAmbulanceLocation] = useState('');
+  const [selectedDriver, setSelectedDriver] = useState('');
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [noteText, setNoteText] = useState('');
   const [agentStatus, setAgentStatus] = useState('Online');
+  const [isPatientOnHold, setIsPatientOnHold] = useState(false);
+  const [driverCallState, setDriverCallState] = useState('idle');
   
   // Feedback Toast State
   const [feedbackToast, setFeedbackToast] = useState(null);
@@ -350,9 +355,12 @@ export default function Workspace() {
                             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                 <svg className="w-16 h-16 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             </div>
-                            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-4">Caller Profile</h3>
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Caller Profile</h3>
+                                {isPatientOnHold && <span className="text-[9px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/20 px-2 py-1 rounded-md animate-pulse border border-amber-500/30">PATIENT ON HOLD</span>}
+                            </div>
                             {activeCall ? (
-                                <div>
+                                <div className={`${isPatientOnHold ? 'opacity-50 pointer-events-none grayscale blur-[1px] transition-all duration-500' : 'transition-all duration-500'}`}>
                                     <h4 className="text-xl font-bold text-zinc-100">{activeCall.customerInfo?.full_name || 'Unknown Caller'}</h4>
                                     <p className="text-xs text-zinc-400 font-mono mt-1">{activeCall.callerNumber}</p>
                                     
@@ -484,6 +492,16 @@ export default function Workspace() {
                                     End Call
                                 </button>
                             </div>
+                            <button 
+                                onClick={() => {
+                                    setAmbulanceLocation(activeCall?.customerInfo?.address || '');
+                                    setShowAmbulanceModal(true);
+                                }}
+                                className="w-full mt-4 bg-red-600 hover:bg-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)] py-4 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all flex justify-center items-center gap-3 animate-pulse hover:animate-none transform hover:-translate-y-1"
+                            >
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                Dispatch Ambulance
+                            </button>
                         </div>
                     </div>
 
@@ -852,6 +870,105 @@ export default function Workspace() {
                         Confirm Schedule
                     </button>
                 </div>
+            </div>
+            </>
+        )}
+
+        {/* Ambulance Dispatch Modal */}
+        {showAmbulanceModal && (
+            <>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 animate-in fade-in duration-300" onClick={() => setShowAmbulanceModal(false)}></div>
+            <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#09090b] border border-red-500/30 p-8 rounded-3xl shadow-[0_0_50px_rgba(220,38,38,0.15)] w-[500px] animate-in zoom-in-95 duration-300">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center text-red-500 border border-red-500/30 animate-pulse">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-red-400 tracking-tight">Emergency Dispatch</h3>
+                            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mt-1">Book Ambulance</p>
+                        </div>
+                    </div>
+                    <button onClick={() => setShowAmbulanceModal(false)} className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                {driverCallState === 'idle' && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Pickup Location</label>
+                            <textarea 
+                                rows="2"
+                                value={ambulanceLocation}
+                                onChange={(e) => setAmbulanceLocation(e.target.value)}
+                                placeholder="Enter exact address or landmark..."
+                                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all resize-none"
+                            ></textarea>
+                        </div>
+
+                        <div>
+                            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Select 3rd-Party Driver</label>
+                            <select 
+                                value={selectedDriver}
+                                onChange={(e) => setSelectedDriver(e.target.value)}
+                                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/50 transition-all appearance-none"
+                            >
+                                <option value="" disabled>-- Choose Available Driver --</option>
+                                <option value="Rajesh Kumar (Apollo 1)">Rajesh Kumar (Apollo 1) - 2 mins away</option>
+                                <option value="Suresh Singh (Apollo 4)">Suresh Singh (Apollo 4) - 5 mins away</option>
+                                <option value="Amit Patel (Apollo 2)">Amit Patel (Apollo 2) - 8 mins away</option>
+                            </select>
+                        </div>
+
+                        <button 
+                            onClick={() => {
+                                if (!ambulanceLocation || !selectedDriver) {
+                                    alert('Please provide location and select a driver.');
+                                    return;
+                                }
+                                setIsPatientOnHold(true);
+                                setDriverCallState('calling');
+                                setTimeout(() => setDriverCallState('connected'), 2500);
+                            }}
+                            className="w-full mt-4 bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl uppercase tracking-[0.1em] shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:-translate-y-1"
+                        >
+                            Hold Patient & Call Driver
+                        </button>
+                    </div>
+                )}
+
+                {driverCallState === 'calling' && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center border-4 border-yellow-500/30 border-t-yellow-500 animate-spin mb-6"></div>
+                        <h3 className="text-xl font-bold text-yellow-400 tracking-tight animate-pulse mb-2">Calling Driver...</h3>
+                        <p className="text-zinc-400 text-sm">Putting {activeCall?.customerInfo?.full_name || 'Patient'} on hold.</p>
+                    </div>
+                )}
+
+                {driverCallState === 'connected' && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.3)] mb-6 animate-pulse">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                        </div>
+                        <h3 className="text-2xl font-black text-emerald-400 tracking-tight mb-2">Connected to {selectedDriver}</h3>
+                        <p className="text-zinc-400 text-sm mb-6">Read out the pickup location:</p>
+                        <div className="bg-zinc-900 border border-white/5 p-4 rounded-xl w-full mb-8">
+                            <p className="text-sm font-bold text-zinc-200">{ambulanceLocation}</p>
+                        </div>
+
+                        <button 
+                            onClick={() => {
+                                setDriverCallState('idle');
+                                setIsPatientOnHold(false);
+                                setShowAmbulanceModal(false);
+                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-4 rounded-xl uppercase tracking-[0.1em] shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all hover:-translate-y-1"
+                        >
+                            End Driver Call & Resume Patient
+                        </button>
+                    </div>
+                )}
             </div>
             </>
         )}

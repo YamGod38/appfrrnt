@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { Stethoscope, Activity, CalendarClock, ChevronDown, CheckCircle2, XCircle, Search, UserPlus, Trash2, ShieldAlert, Plus } from 'lucide-react';
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
-
 export default function ManageDoctors() {
     const [doctors, setDoctors] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -13,44 +11,51 @@ export default function ManageDoctors() {
     const [newScanName, setNewScanName] = useState('');
     const [newScanPrep, setNewScanPrep] = useState('');
     const [newScanDuration, setNewScanDuration] = useState('');
+    const [socket, setSocket] = useState(null);
 
     useEffect(() => {
-        socket.emit('GET_INITIAL_STATE');
-        socket.on('DOCTOR_STATUS_SYNC', (data) => {
+        const newSocket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { 
+            auth: { token: localStorage.getItem('token') } 
+        });
+        setSocket(newSocket);
+
+        newSocket.emit('GET_INITIAL_STATE');
+        newSocket.on('DOCTOR_STATUS_SYNC', (data) => {
             setDoctors(data);
         });
 
-        socket.on('SCAN_TYPES_SYNC', (scans) => {
+        newSocket.on('SCAN_TYPES_SYNC', (scans) => {
             setScanTypes(scans);
         });
 
         return () => {
-            socket.off('DOCTOR_STATUS_SYNC');
-            socket.off('SCAN_TYPES_SYNC');
+            newSocket.off('DOCTOR_STATUS_SYNC');
+            newSocket.off('SCAN_TYPES_SYNC');
+            newSocket.disconnect();
         };
     }, []);
 
     const updateStatus = (id, newStatus) => {
-        socket.emit('UPDATE_DOCTOR_STATUS', { id, status: newStatus });
+        if (socket) socket.emit('UPDATE_DOCTOR_STATUS', { id, status: newStatus });
     };
 
     const handleAddDoctor = (e) => {
         e.preventDefault();
-        if (!newDoc.name || !newDoc.spec) return;
+        if (!newDoc.name || !newDoc.spec || !socket) return;
         socket.emit('ADD_DOCTOR', { name: `Dr. ${newDoc.name}`, spec: newDoc.spec });
         setNewDoc({ name: '', spec: '' });
         setShowAddModal(false);
     };
 
     const handleRemoveDoctor = (id) => {
-        if (confirm("Are you sure you want to remove this doctor from the active roster?")) {
+        if (socket && confirm("Are you sure you want to remove this doctor from the active roster?")) {
             socket.emit('REMOVE_DOCTOR', id);
         }
     };
 
     const handleAddScan = (e) => {
         e.preventDefault();
-        if (!newScanName) return;
+        if (!newScanName || !socket) return;
         socket.emit('ADD_SCAN_TYPE', { 
             name: newScanName, 
             prep: newScanPrep || 'No special preparation needed.', 
@@ -62,7 +67,7 @@ export default function ManageDoctors() {
     };
 
     const handleDeleteScan = (id) => {
-        socket.emit('REMOVE_SCAN_TYPE', id);
+        if (socket) socket.emit('REMOVE_SCAN_TYPE', id);
     };
 
     const getStatusColor = (status) => {

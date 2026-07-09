@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AdminLayout from './layouts/AdminLayout';
 import AgentLayout from './layouts/AgentLayout';
-import CrmLayout from './layouts/CrmLayout';
 import ReceptionLayout from './layouts/ReceptionLayout';
 import Login from './pages/auth/Login';
 import ControlRoom from './pages/admin/ControlRoom';
@@ -18,6 +17,7 @@ import AttendanceLogs from './pages/admin/AttendanceLogs';
 import WhatsappDashboard from './pages/admin/WhatsappDashboard';
 import BookingLogs from './pages/admin/BookingLogs';
 import AdminKnowledge from './pages/admin/AdminKnowledge';
+import ServiceChart from './pages/admin/ServiceChart';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -44,22 +44,16 @@ function App() {
             <Route path="attendance" element={<AttendanceLogs />} />
             <Route path="whatsapp" element={<WhatsappDashboard />} />
             <Route path="knowledge" element={<AdminKnowledge />} />
+            <Route path="services" element={<ServiceChart />} />
           </Route>
         </Route>
 
-        {/* CRM Routes */}
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route path="/crm" element={<CrmLayout />}>
-            <Route index element={<Navigate to="leads" replace />} />
-            <Route path="leads" element={<ManageLeads />} />
-            <Route path="accounts" element={<div className="p-8 text-center text-zinc-500 font-bold">Accounts Module Coming Soon</div>} />
-          </Route>
-        </Route>
 
         {/* Agent Routes */}
         <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'AGENT']} />}>
           <Route path="/agent" element={<AgentLayout />}>
             <Route index element={<Workspace />} />
+            <Route path="services" element={<ServiceChart />} />
           </Route>
         </Route>
 
