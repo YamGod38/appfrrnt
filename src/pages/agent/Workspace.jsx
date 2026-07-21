@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import socket, { connectSocket } from '../../utils/socket';
 import WebRTCDialer from '../../components/dialer/WebRTCDialer';
 import KnowledgeBase from '../../components/knowledge-base/KnowledgeBase';
 import InteractionTimeline from '../../components/timeline/InteractionTimeline';
@@ -14,9 +14,6 @@ import WhatsappDashboard from '../admin/WhatsappDashboard';
 import BookingLogs from '../admin/BookingLogs';
 import PatientProfileModal from '../../components/dashboard/PatientProfileModal';
 import BillingEstimator from '../../components/dashboard/BillingEstimator';
-
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
-
 export default function Workspace() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null); 
@@ -52,6 +49,9 @@ export default function Workspace() {
   const [triageNotes, setTriageNotes] = useState('');
   const [triageResult, setTriageResult] = useState(null);
 
+  useEffect(() => {
+    connectSocket();
+  }, []);
   useEffect(() => {
       if (triageNotes.trim().length === 0) {
           setTriageResult(null);

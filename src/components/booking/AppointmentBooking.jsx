@@ -1,21 +1,47 @@
 import { useState, useEffect } from 'react';
-import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare, UserCircle, Edit2, Save } from 'lucide-react';
-import { io } from 'socket.io-client';
+import { CalendarDays, Clock, CheckCircle2, Loader2, Sparkles, ChevronRight, Stethoscope, Activity, XCircle, MessageSquare, UserCircle, Edit2, Save, X, Plus } from 'lucide-react';
+import socket from '../../utils/socket';
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
-
+const COMMON_LAB_TESTS = [
+    'CBC (Complete Blood Count)', 'Lipid Profile', 'Thyroid Profile (T3, T4, TSH)', 
+    'HbA1c', 'LFT (Liver Function Test)', 'KFT (Kidney Function Test)', 
+    'Vitamin D', 'Vitamin B12', 'Iron Profile', 'RBS (Random Blood Sugar)', 
+    'FBS (Fasting Blood Sugar)', 'PPBS (Post Prandial Blood Sugar)', 
+    'Urine Routine', 'CRP (C-Reactive Protein)', 'D-Dimer', 'Widal Test', 
+    'Dengue NS1', 'Malaria Antigen'
+];
 export default function AppointmentBooking({ activeCall }) {
     const [bookingMode, setBookingMode] = useState('consultation'); // 'consultation', 'scan', 'blood'
     const [selectedDoctor, setSelectedDoctor] = useState(null);
     const [selectedScan, setSelectedScan] = useState(null);
     const [addressNotes, setAddressNotes] = useState('');
     const [labTests, setLabTests] = useState('');
+    const [testSearch, setTestSearch] = useState('');
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
+    const addTest = (test) => {
+        const currentTests = labTests.split(',').map(t => t.trim()).filter(t => t);
+        if (!currentTests.includes(test)) {
+            setLabTests([...currentTests, test].join(', '));
+        }
+        setTestSearch('');
+        setShowSuggestions(false);
+    };
+
+    const removeTest = (testToRemove) => {
+        const currentTests = labTests.split(',').map(t => t.trim()).filter(t => t && t !== testToRemove);
+        setLabTests(currentTests.join(', '));
+    };
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedTime, setSelectedTime] = useState(null);
     const [status, setStatus] = useState('idle');
     const [doctors, setDoctors] = useState([]);
     const [scanTypes, setScanTypes] = useState([]);
     const [isSendingWA, setIsSendingWA] = useState(false);
+    
+    // Token System States
+    const [patientPriority, setPatientPriority] = useState('Routine'); // 'Routine', 'Critical'
+    const [generatedToken, setGeneratedToken] = useState(null);
     
     // Patient Profile States
     const [patientName, setPatientName] = useState(activeCall?.customerInfo?.full_name || 'Walk-in Patient');
@@ -45,9 +71,18 @@ export default function AppointmentBooking({ activeCall }) {
             setScanTypes(scans);
         });
 
+        socket.on('BOOKING_CONFIRMED', (booking) => {
+            // If it's a consultation booking, capture the generated token
+            if (booking.type === 'APPOINTMENT') {
+                setGeneratedToken(booking.token_number);
+                setStatus('success');
+            }
+        });
+
         return () => {
             socket.off('DOCTOR_STATUS_SYNC');
             socket.off('SCAN_TYPES_SYNC');
+            socket.off('BOOKING_CONFIRMED');
         };
     }, []);
 
@@ -79,47 +114,51 @@ export default function AppointmentBooking({ activeCall }) {
         if ((bookingMode === 'consultation' && !selectedDoctor) || (bookingMode === 'scan' && !selectedScan) || (bookingMode === 'blood' && (!addressNotes || !labTests)) || !selectedDate || !selectedTime) return;
         setStatus('booking');
         
-        // Simulate network request
-        setTimeout(() => {
-            setStatus('success');
-            const agentName = localStorage.getItem('name') || 'Agent Alpha';
-            const huid = patientHuid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
-            
-            if (bookingMode === 'consultation') {
-                const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
-                socket.emit('BOOKING_MADE', {
-                    patientName: patientName,
-                    huid: huid,
-                    number: patientPhone,
-                    doctor: docName,
-                    date: selectedDate,
-                    time: selectedTime,
-                    agentName: agentName
-                });
-            } else if (bookingMode === 'scan') {
-                const scan = scanTypes.find(s => s.id === selectedScan);
-                socket.emit('SCAN_BOOKING_MADE', {
-                    patientName: patientName,
-                    huid: huid,
-                    number: patientPhone,
-                    scanType: scan?.name,
-                    date: selectedDate,
-                    time: selectedTime,
-                    agentName: agentName
-                });
-            } else if (bookingMode === 'blood') {
-                socket.emit('BLOOD_COLLECTION_MADE', {
-                    patientName: patientName,
-                    huid: huid,
-                    number: patientPhone,
-                    notes: `Tests: ${labTests}`,
-                    address: addressNotes,
-                    date: selectedDate,
-                    time: selectedTime,
-                    agentName: agentName
-                });
-            }
-        }, 2000);
+        const agentName = localStorage.getItem('name') || 'Agent Alpha';
+        const huid = patientHuid || 'WALK-IN-' + Math.floor(Math.random() * 100000);
+        
+        if (bookingMode === 'consultation') {
+            const docName = doctors.find(d => d.id === selectedDoctor)?.name || 'Dr. Assigned';
+            socket.emit('BOOKING_MADE', {
+                patientName: patientName,
+                huid: huid,
+                number: patientPhone,
+                doctor: docName,
+                date: selectedDate,
+                time: selectedTime,
+                agentName: agentName,
+                priority: patientPriority
+            });
+            // We do NOT set status='success' here. We wait for BOOKING_CONFIRMED from server to get the Token.
+        } else {
+            // Simulate network request for non-consultations
+            setTimeout(() => {
+                setStatus('success');
+                if (bookingMode === 'scan') {
+                    const scan = scanTypes.find(s => s.id === selectedScan);
+                    socket.emit('SCAN_BOOKING_MADE', {
+                        patientName: patientName,
+                        huid: huid,
+                        number: patientPhone,
+                        scanType: scan?.name,
+                        date: selectedDate,
+                        time: selectedTime,
+                        agentName: agentName
+                    });
+                } else if (bookingMode === 'blood') {
+                    socket.emit('BLOOD_COLLECTION_MADE', {
+                        patientName: patientName,
+                        huid: huid,
+                        number: patientPhone,
+                        notes: `Tests: ${labTests}`,
+                        address: addressNotes,
+                        date: selectedDate,
+                        time: selectedTime,
+                        agentName: agentName
+                    });
+                }
+            }, 1000);
+        }
     };
 
     const handleWhatsAppSend = async () => {
@@ -230,15 +269,31 @@ export default function AppointmentBooking({ activeCall }) {
                             </div>
                         </div>
 
-                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-6 flex justify-between items-center print:bg-gray-100 print:border-gray-300">
-                            <div>
-                                <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1 print:text-gray-500">Date</p>
-                                <p className="text-xl font-black text-emerald-400 print:text-black">{selectedDate}</p>
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-6 flex flex-col gap-4 print:bg-gray-100 print:border-gray-300">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1 print:text-gray-500">Date</p>
+                                    <p className="text-xl font-black text-emerald-400 print:text-black">{selectedDate}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1 print:text-gray-500">Time Block</p>
+                                    <p className="text-xl font-black text-emerald-400 print:text-black">{selectedTime}</p>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1 print:text-gray-500">Time</p>
-                                <p className="text-xl font-black text-emerald-400 print:text-black">{selectedTime}</p>
-                            </div>
+                            
+                            {bookingMode === 'consultation' && generatedToken && (
+                                <div className="mt-2 pt-4 border-t border-emerald-500/20 text-center">
+                                    <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-2 print:text-gray-500">Queue Token Number</p>
+                                    <div className="inline-block px-8 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+                                        <p className={`text-4xl font-black tracking-tight ${generatedToken.startsWith('P') ? 'text-rose-400' : 'text-emerald-400'} print:text-black`}>
+                                            {generatedToken}
+                                        </p>
+                                        <p className="text-xs font-bold text-zinc-400 mt-1 uppercase tracking-widest">
+                                            {generatedToken.startsWith('P') ? 'Priority Queue' : 'Routine Queue'}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -401,15 +456,61 @@ export default function AppointmentBooking({ activeCall }) {
                         <div className="bg-zinc-900/50 border border-white/5 rounded-2xl p-6 relative overflow-hidden group space-y-4">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-3xl rounded-full pointer-events-none"></div>
                             
-                            <div className="relative z-10">
+                            <div className="relative z-20">
                                 <label className="text-xs font-bold text-zinc-300 mb-2 block">Lab Tests Required</label>
-                                <input
-                                    type="text"
-                                    value={labTests}
-                                    onChange={(e) => setLabTests(e.target.value)}
-                                    placeholder="e.g. CBC, Lipid Profile, Thyroid, HbA1c..."
-                                    className="w-full bg-zinc-950 text-zinc-100 rounded-xl p-4 border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.8)] focus:outline-none focus:border-rose-500/50 focus:ring-4 focus:ring-rose-500/10 transition-all text-sm"
-                                />
+                                
+                                <div className="w-full bg-zinc-950 rounded-xl border border-white/10 shadow-[inset_0_2px_15px_rgba(0,0,0,0.8)] focus-within:border-rose-500/50 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all min-h-[56px] p-2 flex flex-wrap gap-2 items-center relative">
+                                    {labTests.split(',').map(test => test.trim()).filter(t => t).map((test, idx) => (
+                                        <span key={idx} className="bg-rose-500/20 text-rose-300 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-rose-500/30 shadow-sm">
+                                            {test}
+                                            <button type="button" onClick={() => removeTest(test)} className="hover:text-white transition-colors">
+                                                <X className="w-3 h-3"/>
+                                            </button>
+                                        </span>
+                                    ))}
+                                    
+                                    <input
+                                        type="text"
+                                        value={testSearch}
+                                        onChange={(e) => {
+                                            setTestSearch(e.target.value);
+                                            setShowSuggestions(true);
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                                        onKeyDown={(e) => {
+                                            if(e.key === 'Enter' && testSearch.trim()) {
+                                                e.preventDefault();
+                                                addTest(testSearch.trim());
+                                            }
+                                        }}
+                                        placeholder={labTests ? "" : "Search or type test name..."}
+                                        className="flex-1 bg-transparent border-none focus:outline-none text-zinc-100 text-sm min-w-[150px] px-2 h-8"
+                                    />
+                                    
+                                    {showSuggestions && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-[#18181b] border border-white/10 rounded-xl shadow-[0_15px_50px_rgba(0,0,0,0.9)] z-50 max-h-56 overflow-y-auto custom-scrollbar">
+                                            {COMMON_LAB_TESTS.filter(t => t.toLowerCase().includes(testSearch.toLowerCase()) && !labTests.split(',').map(lt => lt.trim()).includes(t)).map(t => (
+                                                <div 
+                                                    key={t}
+                                                    className="px-4 py-3 hover:bg-rose-500/20 cursor-pointer text-sm text-zinc-300 hover:text-rose-400 transition-colors border-b border-white/5 last:border-0"
+                                                    onClick={() => addTest(t)}
+                                                >
+                                                    {t}
+                                                </div>
+                                            ))}
+                                            {testSearch.trim().length > 0 && !COMMON_LAB_TESTS.some(t => t.toLowerCase() === testSearch.trim().toLowerCase()) && (
+                                                <div 
+                                                    className="px-4 py-3 hover:bg-rose-500/20 cursor-pointer text-sm text-zinc-300 hover:text-rose-400 transition-colors flex justify-between items-center"
+                                                    onClick={() => addTest(testSearch.trim())}
+                                                >
+                                                    <span>Add custom: "{testSearch.trim()}"</span>
+                                                    <Plus className="w-4 h-4" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="relative z-10">
@@ -430,11 +531,34 @@ export default function AppointmentBooking({ activeCall }) {
 
                     <div className="h-px w-full bg-gradient-to-r from-transparent via-white/[0.05] to-transparent"></div>
 
+                    {/* PRIORITY TOGGLE (Consultation Only) */}
+                    {bookingMode === 'consultation' && (
+                        <div className={`mt-8 transition-opacity duration-300 ${!selectedDoctor ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">2. Patient Condition (Triage Queue)</label>
+                            <div className="flex gap-4">
+                                <button 
+                                    type="button"
+                                    onClick={() => setPatientPriority('Routine')}
+                                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase transition-all border ${patientPriority === 'Routine' ? 'bg-zinc-800 text-zinc-100 border-zinc-600 shadow-md' : 'bg-zinc-900 border-white/[0.05] text-zinc-500 hover:border-white/20'}`}
+                                >
+                                    Routine
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setPatientPriority('Critical')}
+                                    className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold tracking-widest uppercase transition-all border ${patientPriority === 'Critical' ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.2)]' : 'bg-zinc-900 border-white/[0.05] text-zinc-500 hover:border-rose-500/30 hover:text-rose-400'}`}
+                                >
+                                    Critical / Priority
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* DATE & TIME SELECTION */}
                     <div className="grid grid-cols-2 gap-8 mt-8">
                         {/* DATE */}
                         <div className={`transition-opacity duration-300 ${(!selectedDoctor && !selectedScan && bookingMode !== 'blood') ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
-                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">2. Choose Date</label>
+                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] mb-4 block">{bookingMode === 'consultation' ? '3.' : '2.'} Choose Date</label>
                             <div className="relative group/input">
                                 <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none z-10">
                                     <CalendarDays className="w-5 h-5 text-zinc-500 group-focus-within/input:text-emerald-400 transition-colors" />

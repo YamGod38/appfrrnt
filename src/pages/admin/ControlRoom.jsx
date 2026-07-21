@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
+import socket, { connectSocket } from '../../utils/socket';
 import { Phone, CalendarCheck, Clock, ShieldCheck, UserCheck, Activity, ChevronRight, Bell, Send } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import AgentStatusWidget from '../../components/agents/AgentStatusWidget';
@@ -15,9 +15,10 @@ const mockChartData = [
   { time: '18:00', inbound: 23, outbound: 12 }
 ];
 
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
-
 export default function ControlRoom() {
+    useEffect(() => {
+        connectSocket();
+    }, []);
     const [attendanceLogs, setAttendanceLogs] = useState([]);
     const [recentBookings, setRecentBookings] = useState([]);
     const [memoInput, setMemoInput] = useState('');

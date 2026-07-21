@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { ShieldCheck, Activity, Users, Headset, Clock, Star, Plus, Shield, Headphones, Calendar, CheckCircle2, Settings, X } from 'lucide-react';
-import { io } from 'socket.io-client';
-
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
+import socket, { connectSocket } from '../../utils/socket';
 import LiveAnalytics from '../../components/admin/LiveAnalytics';
 
 export default function ManageAgents() {
+    useEffect(() => {
+        connectSocket();
+    }, []);
     const [activeTab, setActiveTab] = useState('roster'); // roster, analytics, provisioning
     const [editingAgent, setEditingAgent] = useState(null);
     const [showEditModal, setShowEditModal] = useState(false);

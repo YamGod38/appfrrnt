@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Target, Activity, Users, CalendarCheck, PhoneIncoming, TrendingUp, Search, Download, X, Stethoscope, Bell, CloudRain, CloudSnow, CloudLightning, Cloud, Sun, CloudFog, MapPin, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { io } from 'socket.io-client';
+import socket, { connectSocket } from '../../utils/socket';
 import BedManagement from '../../components/admin/BedManagement';
-
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
+import LiveQueueBoard from '../../components/admin/LiveQueueBoard';
 
 export default function Reception() {
+    useEffect(() => {
+        connectSocket();
+    }, []);
     const [stats, setStats] = useState(null);
     const [allBookings, setAllBookings] = useState([]);
     const [doctors, setDoctors] = useState([]);
@@ -352,6 +354,11 @@ export default function Reception() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Live Queue Board Section */}
+            <div className="mb-6">
+                <LiveQueueBoard allBookings={allBookings} doctors={doctors} />
             </div>
 
             {/* Premium Smart Bed Map Section */}

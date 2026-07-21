@@ -4,6 +4,7 @@ import AgentLayout from './layouts/AgentLayout';
 import ReceptionLayout from './layouts/ReceptionLayout';
 import Login from './pages/auth/Login';
 import ControlRoom from './pages/admin/ControlRoom';
+import AdminConsole from './pages/admin/AdminConsole';
 import Reception from './pages/admin/Reception';
 import Workspace from './pages/agent/Workspace';
 import Feedback from './pages/Feedback';
@@ -34,6 +35,7 @@ function App() {
         <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<ControlRoom />} />
+            <Route path="console" element={<AdminConsole />} />
             <Route path="reception" element={<Reception />} />
             <Route path="agents" element={<ManageAgents />} />
             <Route path="doctors" element={<ManageDoctors />} />
@@ -44,7 +46,7 @@ function App() {
             <Route path="attendance" element={<AttendanceLogs />} />
             <Route path="whatsapp" element={<WhatsappDashboard />} />
             <Route path="knowledge" element={<AdminKnowledge />} />
-            <Route path="services" element={<ServiceChart />} />
+            <Route path="services" element={<ServiceChart isAdmin={true} />} />
           </Route>
         </Route>
 

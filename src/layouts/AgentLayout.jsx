@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 import { Activity, LogOut, Phone, FileText } from 'lucide-react';
-import { io } from 'socket.io-client';
-
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
+import socket, { connectSocket } from '../utils/socket';
 
 export default function AgentLayout() {
+    useEffect(() => {
+        connectSocket();
+    }, []);
     const role = localStorage.getItem('role');
     const [agentStatus, setAgentStatus] = useState('Online');
     const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);

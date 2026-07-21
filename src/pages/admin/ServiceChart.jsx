@@ -1,24 +1,28 @@
-import React, { useState } from 'react';
-import { Search, Stethoscope, Activity, FileText, Pill, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Activity, Edit2, Save, X } from 'lucide-react';
+import socket from '../../utils/socket';
 
-const mockServices = [
-    { id: 1, category: 'Consultation', name: 'General Physician Consultation', price: '₹500', duration: '15 mins', tier: 'Basic' },
-    { id: 2, category: 'Consultation', name: 'Specialist Consultation', price: '₹1,200', duration: '30 mins', tier: 'Premium' },
-    { id: 3, category: 'Diagnostics', name: 'Full Body Blood Test (CBC)', price: '₹850', duration: '10 mins', tier: 'Basic' },
-    { id: 4, category: 'Diagnostics', name: 'MRI Scan (Brain)', price: '₹7,500', duration: '45 mins', tier: 'Premium' },
-    { id: 5, category: 'Diagnostics', name: 'X-Ray (Chest)', price: '₹400', duration: '15 mins', tier: 'Basic' },
-    { id: 6, category: 'Procedure', name: 'ECG', price: '₹300', duration: '10 mins', tier: 'Basic' },
-    { id: 7, category: 'Procedure', name: 'Minor Suturing', price: '₹1,500', duration: '30 mins', tier: 'Standard' },
-    { id: 8, category: 'Emergency', name: 'Ambulance Dispatch (Base)', price: '₹2,000', duration: 'N/A', tier: 'Critical' },
-    { id: 9, category: 'Emergency', name: 'ICU Bed (Per Day)', price: '₹15,000', duration: '24 hours', tier: 'Critical' },
-    { id: 10, category: 'Pharmacy', name: 'Standard First Aid Kit', price: '₹250', duration: 'N/A', tier: 'Basic' }
-];
-
-export default function ServiceChart() {
+export default function ServiceChart({ isAdmin = false }) {
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState('All');
+    const [services, setServices] = useState([]);
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({});
 
-    const filteredServices = mockServices.filter(service => {
+    useEffect(() => {
+        const handleSync = (data) => setServices(data);
+        socket.on('SERVICE_CATALOG_SYNC', handleSync);
+        
+        if (socket.connected) {
+            socket.emit('GET_INITIAL_STATE');
+        }
+
+        return () => {
+            socket.off('SERVICE_CATALOG_SYNC', handleSync);
+        };
+    }, []);
+
+    const filteredServices = services.filter(service => {
         const matchesSearch = service.name.toLowerCase().includes(search.toLowerCase());
         const matchesFilter = filter === 'All' || service.category === filter;
         return matchesSearch && matchesFilter;
@@ -34,6 +38,20 @@ export default function ServiceChart() {
     };
 
     const categories = ['All', 'Consultation', 'Diagnostics', 'Procedure', 'Emergency', 'Pharmacy'];
+
+    const handleEditClick = (service) => {
+        setEditingId(service.id);
+        setEditForm(service);
+    };
+
+    const handleSave = () => {
+        socket.emit('UPDATE_SERVICE', editForm);
+        setEditingId(null);
+    };
+
+    const handleCancel = () => {
+        setEditingId(null);
+    };
 
     return (
         <div className="flex flex-col gap-6 h-full max-w-7xl mx-auto w-full relative z-10 animate-in fade-in duration-500">
@@ -60,7 +78,7 @@ export default function ServiceChart() {
             </header>
 
             {/* Category Filters */}
-            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar shrink-0">
                 {categories.map(cat => (
                     <button 
                         key={cat}
@@ -76,29 +94,77 @@ export default function ServiceChart() {
             <div className="flex-1 overflow-y-auto custom-scrollbar pb-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredServices.map(service => (
-                        <div key={service.id} className="bg-zinc-900/60 border border-white/5 p-6 rounded-2xl shadow-xl hover:border-emerald-500/30 transition-all duration-300 group relative overflow-hidden">
-                            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                        <div key={service.id} className={`bg-zinc-900/60 border ${editingId === service.id ? 'border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'border-white/5 hover:border-emerald-500/30'} p-6 rounded-2xl shadow-xl transition-all duration-300 group relative overflow-hidden`}>
+                            {editingId !== service.id && <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>}
                             
-                            <div className="flex justify-between items-start mb-6 relative z-10">
-                                <div>
-                                    <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1">{service.category}</p>
-                                    <h3 className="text-lg font-bold text-zinc-100 group-hover:text-emerald-50 transition-colors leading-tight pr-4">{service.name}</h3>
-                                </div>
-                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${getTierColor(service.tier)} shrink-0`}>
-                                    {service.tier}
-                                </span>
-                            </div>
+                            {isAdmin && editingId !== service.id && (
+                                <button onClick={() => handleEditClick(service)} className="absolute top-4 right-4 p-2 bg-black/40 hover:bg-emerald-500/20 text-zinc-400 hover:text-emerald-400 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-20">
+                                    <Edit2 className="w-4 h-4" />
+                                </button>
+                            )}
 
-                            <div className="space-y-4 relative z-10">
-                                <div className="flex justify-between items-center border-b border-white/5 pb-4">
-                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Base Price</span>
-                                    <span className="text-xl font-black text-white group-hover:text-emerald-400 transition-colors">{service.price}</span>
+                            {editingId === service.id ? (
+                                <div className="space-y-4 relative z-10">
+                                    <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-3">
+                                        <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Edit2 className="w-3 h-3" /> Editing Service
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={handleSave} className="p-1.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-zinc-950 rounded transition-colors"><Save className="w-4 h-4" /></button>
+                                            <button onClick={handleCancel} className="p-1.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white rounded transition-colors"><X className="w-4 h-4" /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block">Service Name</label>
+                                            <input type="text" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-emerald-500/50 outline-none" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block">Price</label>
+                                                <input type="text" value={editForm.price} onChange={e => setEditForm({...editForm, price: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-emerald-500/50 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block">Duration</label>
+                                                <input type="text" value={editForm.duration} onChange={e => setEditForm({...editForm, duration: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-emerald-500/50 outline-none" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1 block">Tier</label>
+                                            <select value={editForm.tier} onChange={e => setEditForm({...editForm, tier: e.target.value})} className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 focus:border-emerald-500/50 outline-none appearance-none custom-select">
+                                                <option value="Basic" className="bg-zinc-900 text-zinc-200">Basic</option>
+                                                <option value="Standard" className="bg-zinc-900 text-zinc-200">Standard</option>
+                                                <option value="Premium" className="bg-zinc-900 text-zinc-200">Premium</option>
+                                                <option value="Critical" className="bg-zinc-900 text-zinc-200">Critical</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Est. Duration</span>
-                                    <span className="text-sm font-semibold text-zinc-300">{service.duration}</span>
-                                </div>
-                            </div>
+                            ) : (
+                                <>
+                                    <div className="flex justify-between items-start mb-6 relative z-10 pr-8">
+                                        <div>
+                                            <p className="text-[10px] font-bold text-emerald-500/70 uppercase tracking-widest mb-1">{service.category}</p>
+                                            <h3 className="text-lg font-bold text-zinc-100 group-hover:text-emerald-50 transition-colors leading-tight pr-4">{service.name}</h3>
+                                        </div>
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${getTierColor(service.tier)} shrink-0`}>
+                                            {service.tier}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-4 relative z-10">
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Base Price</span>
+                                            <span className="text-xl font-black text-white group-hover:text-emerald-400 transition-colors">{service.price}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Est. Duration</span>
+                                            <span className="text-sm font-semibold text-zinc-300">{service.duration}</span>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     ))}
                 </div>

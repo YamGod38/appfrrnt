@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Outlet, Navigate, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, PhoneCall, LogOut, ChevronRight, Activity, Stethoscope, Target, Power, Forward, Play, UserCheck, MessageSquare, ClipboardList, Database, CalendarDays, Phone, BookOpen } from 'lucide-react';
-import { io } from 'socket.io-client';
-
-const socket = io((import.meta.env.VITE_API_URL || 'http://localhost:5000') + '', { auth: { token: localStorage.getItem('token') } });
+import { Outlet, Navigate, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, PhoneCall, LogOut, ChevronRight, Activity, Stethoscope, Target, Power, Forward, Play, UserCheck, MessageSquare, ClipboardList, Database, CalendarDays, Phone, BookOpen, PhoneIncoming } from 'lucide-react';
+import socket, { connectSocket } from '../utils/socket';
 
 export default function AdminLayout() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    
+    useEffect(() => {
+        connectSocket();
+    }, []);
     const role = localStorage.getItem('role');
     const name = localStorage.getItem('name') || 'Admin User';
     
@@ -76,6 +80,15 @@ export default function AdminLayout() {
                         )}
                     </NavLink>
                     
+                    <NavLink to="/admin/console" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
+                        {({ isActive }) => (
+                            <>
+                                <PhoneIncoming className={`w-4 h-4 ${isActive ? 'text-rose-400' : 'text-zinc-500 group-hover:text-zinc-400'}`} />
+                                Call Console
+                                <ChevronRight className={`w-3 h-3 ml-auto transition-opacity ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                            </>
+                        )}
+                    </NavLink>
                     <NavLink to="/admin/reception" className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${isActive ? 'bg-zinc-800/50 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]' : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200'}`}>
                         {({ isActive }) => (
                             <>
@@ -258,8 +271,8 @@ export default function AdminLayout() {
                     </div>
                 </div>
 
-                <div className="flex-1 p-8 relative z-10">
-                    <Outlet />
+                <div className="flex-1 overflow-auto bg-[#020817] custom-scrollbar p-6">
+                    <Outlet context={{ activeAdminCall, setActiveAdminCall }} />
                 </div>
             </main>
 
@@ -407,6 +420,7 @@ export default function AdminLayout() {
                                 onClick={() => {
                                     setActiveAdminCall(emergencyAlert);
                                     setEmergencyAlert(null);
+                                    navigate('/admin/console');
                                 }}
                                 className="flex-[2] py-5 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-emerald-950 rounded-2xl font-black uppercase tracking-[0.2em] text-xs transition-all shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] transform hover:-translate-y-1 active:translate-y-0"
                             >
@@ -418,7 +432,7 @@ export default function AdminLayout() {
             )}
 
             {/* ACTIVE ADMIN CALL WIDGET */}
-            {activeAdminCall && (
+            {activeAdminCall && location.pathname !== '/admin/console' && (
                 <div className="fixed bottom-8 right-8 z-[90] w-96 bg-[#0a0a0a] border border-blue-500/30 rounded-3xl shadow-[0_20px_50px_-15px_rgba(0,0,0,1),0_0_30px_rgba(59,130,246,0.15)] overflow-hidden animate-in slide-in-from-bottom-8 duration-300">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
                     <div className="p-6">
